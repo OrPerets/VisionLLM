@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QTabWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QPlainTextEdit, QTextEdit, QLabel, QComboBox, QProgressBar,
     QCheckBox, QFileDialog, QSplitter, QFrame, QToolBar, QMenuBar, QMenu,
-    QDialog, QLineEdit, QListWidget, QListWidgetItem, QGraphicsDropShadowEffect
+    QDialog, QDialogButtonBox, QLineEdit, QListWidget, QListWidgetItem, QGraphicsDropShadowEffect
 )
 from PySide6.QtCore import Qt, QObject, Signal, QThread, QTimer, QSettings
 from PySide6.QtGui import QShortcut, QKeySequence, QFont, QSyntaxHighlighter, QTextCharFormat, QAction, QIcon, QColor
@@ -29,6 +29,8 @@ from tools.sql_tools import transpile_sql, lint_sql
 import sqlfluff
 import re
 import markdown
+from widgets.chat_message import MessageList, ChatMessageWidget
+from widgets.skeleton import SkeletonBubble
 
 BaseWindow = FramelessWindow if UI_FRAMELESS and QF_AVAILABLE else QWidget
 
@@ -154,11 +156,11 @@ class MarkdownRenderer:
             font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
             font-size: 13px;
         }}
-        pre {{ 
-            background-color: #f8fafc; 
-            padding: 12px; 
-            border-radius: 6px; 
-            border-left: 4px solid #2563eb;
+        pre {{
+            background-color: #f8fafc;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
             overflow-x: auto;
         }}
         pre code {{ 
@@ -493,7 +495,9 @@ class ChatTab(QWidget):
         btns = QHBoxLayout(); btns.setSpacing(8); btns.addStretch(1); btns.addWidget(self.btn_chat); btns.addWidget(self.btn_etl)
 
         # Output area
-        self.output = RichTextOutput()
+        self.output = MessageList()
+        self.empty_label = QLabel("Start a conversation by sending a prompt.")
+        self.empty_label.setAlignment(Qt.AlignCenter)
         self.progress = QProgressBar(); self.progress.setRange(0, 0); self.progress.setVisible(False)
         self.progress.setToolTip("Thinking…")
         self.progress.setMaximumHeight(4)
@@ -510,7 +514,7 @@ class ChatTab(QWidget):
         self.btn_export.setIcon(qta.icon("fa5s.file-export"))
         self.btn_export.setMinimumHeight(28)
         self.btn_copy_out.clicked.connect(self.copy_output)
-        self.btn_clear_out.clicked.connect(lambda: self.output.clear_content())
+        self.btn_clear_out.clicked.connect(self.on_new_chat)
         self.btn_new_chat.clicked.connect(self.on_new_chat)
         self.btn_export.clicked.connect(self.export_transcript)
         out_controls = QHBoxLayout()
@@ -569,8 +573,10 @@ class ChatTab(QWidget):
         response_header.addWidget(self.progress)
         response_header.addStretch(1)
         top_layout.addLayout(response_header)
-        
+
+        top_layout.addWidget(self.empty_label)
         top_layout.addWidget(self.output)
+        self.output.setVisible(False)
         top_layout.addLayout(out_controls)
         top_layout.addWidget(self.logs_toggle)
         top_layout.addWidget(self.logs)
@@ -802,8 +808,12 @@ class ChatTab(QWidget):
         self._start_request(user_text=prompt)
 
     def _start_request(self, user_text: str):
-        self.output.clear_content()
-        self.output.setPlainText("Thinking…")
+        # Show user message and skeleton placeholder
+        self.empty_label.setVisible(False)
+        self.output.setVisible(True)
+        self.output.add_user_message(user_text)
+        self.output.current_assistant = None
+        self.output.show_skeleton(SkeletonBubble())
         self._set_busy(True)
         stream = self.stream_toggle.isChecked()
         self.token_counter = 0
@@ -835,15 +845,27 @@ class ChatTab(QWidget):
 
     def _on_delta(self, d: str):
         # Append to output and update approximate token count
-        self.output.append_streaming_text(d)
+        self.output.remove_skeleton()
+        new = self.output.current_assistant is None
+        widget = self.output.append_streaming_text(d)
+        if new:
+            widget.copy_code.connect(self.handle_copy_code)
+            widget.insert_code.connect(self.handle_insert_code)
+            widget.expand_code.connect(self.handle_expand_code)
         self.token_counter += max(0, len(d.strip().split()))
         self.set_status(f"Streaming… ≈{self.token_counter} tokens")
 
     def _on_finished(self, text: str, meta: dict):
         self.last_meta = meta or {}
+        self.output.remove_skeleton()
+        new = self.output.current_assistant is None
+        widget = self.output.set_final_text(text)
+        if new:
+            widget.copy_code.connect(self.handle_copy_code)
+            widget.insert_code.connect(self.handle_insert_code)
+            widget.expand_code.connect(self.handle_expand_code)
         # Append assistant to history
         self.history.append({"role": "assistant", "content": text})
-        self.output.set_final_text(text)
         self._set_busy(False)
         self.append_log(meta)
         self.refresh_info()
@@ -861,7 +883,13 @@ class ChatTab(QWidget):
                 return
             except Exception as e:
                 err = f"{err} | Fallback failed: {e}"
-        self.output.setPlainText(f"Error: {err}\n\nTip: Ensure Resources/model.gguf exists or configure bootstrap.")
+        self.output.remove_skeleton()
+        widget = self.output.set_final_text(
+            f"Error: {err}\n\nTip: Ensure Resources/model.gguf exists or configure bootstrap."
+        )
+        widget.copy_code.connect(self.handle_copy_code)
+        widget.insert_code.connect(self.handle_insert_code)
+        widget.expand_code.connect(self.handle_expand_code)
         self._set_busy(False)
         self.append_log({}, error=str(err))
         self.set_status("Error")
@@ -973,11 +1001,13 @@ class ChatTab(QWidget):
         self.output.clear_content()
         self.logs.setPlainText("")
         self.input.setPlainText("")
+        self.empty_label.setVisible(True)
+        self.output.setVisible(False)
         self.input.setFocus()
         self.set_status("New chat started")
 
     def copy_output(self):
-        output = self.output.toPlainText().strip()
+        output = self.output.last_assistant_text().strip()
         if not output:
             self.set_status("No response to copy")
             return
@@ -1004,6 +1034,34 @@ class ChatTab(QWidget):
             self.set_status(f"Exported to {filename}")
         except Exception as e:
             self.set_status(f"Export failed: {e}")
+
+    # --------------------------------------------------
+    # Inline code block handlers
+    # --------------------------------------------------
+    def handle_copy_code(self, code: str):
+        QApplication.clipboard().setText(code)
+        self.set_status("Code copied")
+
+    def handle_insert_code(self, code: str):
+        self.input.insertPlainText(code)
+        self.input.setFocus()
+        self.set_status("Code inserted")
+
+    def handle_expand_code(self, code: str):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Code")
+        layout = QVBoxLayout(dlg)
+        edit = QPlainTextEdit(code)
+        edit.setReadOnly(True)
+        edit.setFont(QFont("Courier", 10))
+        layout.addWidget(edit)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        buttons.accepted.connect(dlg.accept)
+        layout.addWidget(buttons)
+        dlg.resize(600, 400)
+        dlg.exec()
+
 
 class SqlTab(QWidget):
     def __init__(self, set_status_callback=None):
