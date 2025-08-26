@@ -5,8 +5,11 @@ from PySide6.QtWidgets import (
     QCheckBox, QFileDialog, QSplitter, QFrame, QToolBar, QMenuBar, QMenu,
     QDialog, QDialogButtonBox, QLineEdit, QListWidget, QListWidgetItem, QGraphicsDropShadowEffect
 )
-from PySide6.QtCore import Qt, QObject, Signal, QThread, QTimer, QSettings
-from PySide6.QtGui import QShortcut, QKeySequence, QFont, QSyntaxHighlighter, QTextCharFormat, QAction, QIcon, QColor
+from PySide6.QtCore import Qt, QObject, Signal, QThread, QTimer, QSettings, QPropertyAnimation
+from PySide6.QtGui import (
+    QShortcut, QKeySequence, QFont, QSyntaxHighlighter, QTextCharFormat,
+    QAction, QIcon, QColor, QTextCursor
+)
 
 import qtawesome as qta
 
@@ -29,8 +32,10 @@ from tools.sql_tools import transpile_sql, lint_sql
 import sqlfluff
 import re
 import markdown
+import html
 from widgets.chat_message import MessageList, ChatMessageWidget
 from widgets.skeleton import SkeletonBubble
+from utils.diff import side_by_side
 
 BaseWindow = FramelessWindow if UI_FRAMELESS and QF_AVAILABLE else QWidget
 
@@ -525,21 +530,8 @@ class ChatTab(QWidget):
         out_controls.addWidget(self.btn_export)
         out_controls.addStretch(1)
 
-        # Logs panel (collapsible)
-        persisted_logs_open = bool(self.settings.value("ui/logs_open", UI_LOGS_OPEN, type=bool))
-        self.logs_toggle = QPushButton("▼ Hide Logs" if persisted_logs_open else "▶ Show Logs")
-        self.logs_toggle.setCheckable(True)
-        self.logs_toggle.setChecked(bool(persisted_logs_open))
-        self.logs_toggle.setToolTip("Toggle request/response metrics")
-        self.logs_toggle.setMinimumHeight(28)
-        self.logs_toggle.toggled.connect(self.toggle_logs)
-        self.logs = QPlainTextEdit(); self.logs.setReadOnly(True)
-        self.logs.setMaximumHeight(120)
-        self.logs.setVisible(bool(persisted_logs_open))
-
-        # Card surfaces
+        # Card surface for output
         apply_card_surface(self.output, initial_theme)
-        apply_card_surface(self.logs, initial_theme)
 
         # Shortcuts
         for seq in ("Ctrl+Return", "Ctrl+Enter", "Meta+Return", "Meta+Enter"):
@@ -574,12 +566,62 @@ class ChatTab(QWidget):
         response_header.addStretch(1)
         top_layout.addLayout(response_header)
 
+        # Meta badges
+        self.badge_model = QLabel()
+        self.badge_temp = QLabel()
+        self.badge_tps = QLabel()
+        for b in (self.badge_model, self.badge_temp, self.badge_tps):
+            b.setStyleSheet(
+                """
+                QLabel {
+                    background-color: #e5e7eb;
+                    border-radius: 8px;
+                    padding: 2px 6px;
+                    font-size: 12px;
+                    color: #374151;
+                }
+                """
+            )
+        badges = QHBoxLayout(); badges.setSpacing(8)
+        badges.addWidget(self.badge_model)
+        badges.addWidget(self.badge_temp)
+        badges.addWidget(self.badge_tps)
+        badges.addStretch(1)
+        top_layout.addLayout(badges)
+
         top_layout.addWidget(self.empty_label)
         top_layout.addWidget(self.output)
         self.output.setVisible(False)
         top_layout.addLayout(out_controls)
-        top_layout.addWidget(self.logs_toggle)
-        top_layout.addWidget(self.logs)
+
+        # Logs drawer
+        persisted_logs_open = bool(self.settings.value("ui/logs_open", UI_LOGS_OPEN, type=bool))
+        self.logs_toggle = QPushButton("Hide Logs" if persisted_logs_open else "Show Logs")
+        self.logs_toggle.setCheckable(True)
+        self.logs_toggle.setChecked(bool(persisted_logs_open))
+        self.logs_toggle.setToolTip("Toggle request/response metrics")
+        self.logs_toggle.setMinimumHeight(28)
+        self.logs_toggle.toggled.connect(self.toggle_logs)
+        self.btn_copy_logs = QPushButton("Copy Logs")
+        self.btn_copy_logs.setMinimumHeight(28)
+        self.btn_copy_logs.clicked.connect(self.copy_logs)
+        logs_header = QHBoxLayout(); logs_header.setSpacing(8)
+        logs_header.addWidget(self.logs_toggle)
+        logs_header.addStretch(1)
+        logs_header.addWidget(self.btn_copy_logs)
+
+        self.logs = QTextEdit(); self.logs.setReadOnly(True)
+        self.logs.setFont(QFont("Courier", 10))
+        apply_card_surface(self.logs, initial_theme)
+        self.logs_container = QWidget()
+        logs_layout = QVBoxLayout(); logs_layout.setContentsMargins(0, 0, 0, 0); logs_layout.setSpacing(4)
+        logs_layout.addWidget(self.logs)
+        self.logs_container.setLayout(logs_layout)
+        self.logs_container.setMaximumHeight(120 if persisted_logs_open else 0)
+
+        top_layout.addLayout(logs_header)
+        top_layout.addWidget(self.logs_container)
+        self.btn_copy_logs.setVisible(persisted_logs_open)
         top_widget.setLayout(top_layout)
         
         # Bottom section (input area)
@@ -759,32 +801,62 @@ class ChatTab(QWidget):
         backend = getattr(self.llm, "backend", "?")
         model = getattr(self.llm, "ollama_model", None) if backend == "ollama" else "GGUF"
         self.model_info.setText(f"Backend: {backend}  |  Model: {model}")
-        self.ctx_info.setText(f"n_ctx: {getattr(self.llm, 'n_ctx', '')}  temp: {getattr(self.llm, 'temperature', '')}  max_tokens: {getattr(self.llm, 'max_tokens', '')}")
+        self.ctx_info.setText(
+            f"n_ctx: {getattr(self.llm, 'n_ctx', '')}  temp: {getattr(self.llm, 'temperature', '')}  max_tokens: {getattr(self.llm, 'max_tokens', '')}"
+        )
+
+        meta = self.last_meta or {}
+        self.badge_model.setText(f"model: {meta.get('model', model)}")
+        temp = meta.get('temperature', getattr(self.llm, 'temperature', ''))
+        self.badge_temp.setText(f"temp: {temp}")
+        tps = meta.get('tokens_per_sec')
+        self.badge_tps.setText(
+            f"tps: {round(tps, 2)}" if tps else "tps: ?"
+        )
 
     def toggle_logs(self, checked: bool):
-        self.logs.setVisible(checked)
-        self.logs_toggle.setText("▼ Hide Logs" if checked else "▶ Show Logs")
+        self.logs_toggle.setText("Hide Logs" if checked else "Show Logs")
+        self.btn_copy_logs.setVisible(checked)
+        anim = QPropertyAnimation(self.logs_container, b"maximumHeight")
+        anim.setDuration(200)
+        anim.setStartValue(self.logs_container.maximumHeight())
+        anim.setEndValue(120 if checked else 0)
+        anim.start()
+        self._logs_anim = anim  # keep reference
         self.settings.setValue("ui/logs_open", bool(checked))
 
     def append_log(self, meta: dict, error: str | None = None):
         parts = []
+        color = "#6b7280"
         if error:
             parts.append(f"Error: {error}")
+            color = "#ef4444"
         if meta:
-            parts.append(f"backend={meta.get('backend')} model={meta.get('model')} n_ctx={meta.get('n_ctx')} temp={meta.get('temperature')} max_tokens={meta.get('max_tokens')}")
-            parts.append(f"start={meta.get('start_time')} end={meta.get('end_time')} elapsed={meta.get('elapsed_sec')}s")
+            parts.append(
+                f"backend={meta.get('backend')} model={meta.get('model')} n_ctx={meta.get('n_ctx')} temp={meta.get('temperature')} max_tokens={meta.get('max_tokens')}"
+            )
+            parts.append(
+                f"start={meta.get('start_time')} end={meta.get('end_time')} elapsed={meta.get('elapsed_sec')}s"
+            )
             usage = meta.get('usage') or {}
             if usage:
-                parts.append(f"usage: prompt={usage.get('prompt_tokens')} completion={usage.get('completion_tokens')} total={usage.get('total_tokens')}")
+                parts.append(
+                    f"usage: prompt={usage.get('prompt_tokens')} completion={usage.get('completion_tokens')} total={usage.get('total_tokens')}"
+                )
             tps = meta.get('tokens_per_sec')
             if tps:
                 parts.append(f"tokens/sec={round(tps, 2)}")
             warnings = meta.get('warnings') or []
             if warnings:
                 parts.append("warnings=" + "; ".join([str(w) for w in warnings]))
+                color = "#ca8a04"  # amber for warnings
         line = " | ".join(parts)
         if line:
-            self.logs.appendPlainText(line)
+            self.logs.append(f"<span style='color:{color}'>{html.escape(line)}</span>")
+
+    def copy_logs(self):
+        QApplication.clipboard().setText(self.logs.toPlainText())
+        show_toast(self, "Logs copied")
 
     def on_preset(self):
         text = self.presets.currentText().strip()
@@ -1680,40 +1752,89 @@ if __name__ == "__main__":
 # --------------------------------------
 
 class DiffDialog(QDialog):
-    """Minimal side-by-side diff/apply dialog."""
+    """Side-by-side diff dialog with color highlighting."""
+
     def __init__(self, title: str, original_text: str, transformed_text: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
         self.result_action = None  # "apply" | "copy" | None
-        self.resize(820, 480)
+        self.resize(820, 520)
+
+        self.left_text = original_text
+        self.right_text = transformed_text
 
         layout = QVBoxLayout(); layout.setContentsMargins(12, 12, 12, 12); layout.setSpacing(8)
         panes = QHBoxLayout(); panes.setSpacing(8)
 
-        left = QPlainTextEdit(); left.setReadOnly(True); left.setPlainText(original_text)
-        right = QPlainTextEdit(); right.setReadOnly(True); right.setPlainText(transformed_text)
-        apply_card_surface(left, THEME)
-        apply_card_surface(right, THEME)
+        self.left = QPlainTextEdit(); self.left.setReadOnly(True)
+        self.right = QPlainTextEdit(); self.right.setReadOnly(True)
+        apply_card_surface(self.left, THEME)
+        apply_card_surface(self.right, THEME)
         font = QFont("Monospace"); font.setStyleHint(QFont.TypeWriter)
-        left.setFont(font); right.setFont(font)
-        left.setLineWrapMode(QPlainTextEdit.NoWrap); right.setLineWrapMode(QPlainTextEdit.NoWrap)
-        panes.addWidget(left); panes.addWidget(right)
+        self.left.setFont(font); self.right.setFont(font)
+        self.left.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.right.setLineWrapMode(QPlainTextEdit.NoWrap)
+        panes.addWidget(self.left); panes.addWidget(self.right)
         layout.addLayout(panes)
 
+        legend = QLabel(
+            "Legend: <span style='background-color:#fee2e2'> deletions </span> <span style='background-color:#dcfce7'> additions </span>"
+        )
+        legend.setTextFormat(Qt.RichText)
+        legend.setStyleSheet("color: #374151; font-size: 12px;")
+        layout.addWidget(legend)
+
         btns = QHBoxLayout(); btns.addStretch(1)
-        btn_apply = QPushButton("Apply to Input"); btn_copy = QPushButton("Copy Result"); btn_close = QPushButton("Close")
-        btns.addWidget(btn_apply); btns.addWidget(btn_copy); btns.addWidget(btn_close)
+        btn_apply = QPushButton("Apply to Input")
+        btn_copy_left = QPushButton("Copy Left")
+        btn_copy_right = QPushButton("Copy Right")
+        btn_swap = QPushButton("Swap View")
+        btn_close = QPushButton("Close")
+        for b in (btn_apply, btn_copy_left, btn_copy_right, btn_swap, btn_close):
+            btns.addWidget(b)
         layout.addLayout(btns)
 
         btn_apply.clicked.connect(lambda: self._finish("apply"))
-        def _copy():
-            QApplication.clipboard().setText(transformed_text)
-            self.result_action = "copy"; self.accept()
-        btn_copy.clicked.connect(_copy)
+        btn_copy_left.clicked.connect(lambda: QApplication.clipboard().setText(self.left_text))
+        btn_copy_right.clicked.connect(lambda: QApplication.clipboard().setText(self.right_text))
+        btn_swap.clicked.connect(self._swap)
         btn_close.clicked.connect(self.reject)
 
+        QShortcut(QKeySequence("Return"), self, activated=lambda: self._finish("apply"))
+        QShortcut(QKeySequence("Enter"), self, activated=lambda: self._finish("apply"))
+        QShortcut(QKeySequence("Escape"), self, activated=self.reject)
+
         self.setLayout(layout)
+        self._render()
+
+    def _render(self):
+        left_lines, right_lines, left_styles, right_styles = side_by_side(self.left_text, self.right_text)
+        self.left.setPlainText("\n".join(left_lines))
+        self.right.setPlainText("\n".join(right_lines))
+        self._apply_styles(self.left, left_styles)
+        self._apply_styles(self.right, right_styles)
+
+    def _apply_styles(self, edit: QPlainTextEdit, styles: list[str | None]):
+        extra = []
+        fmt_add = QTextCharFormat(); fmt_add.setBackground(QColor("#dcfce7"))
+        fmt_del = QTextCharFormat(); fmt_del.setBackground(QColor("#fee2e2"))
+        for i, st in enumerate(styles):
+            if st not in ("add", "del"):
+                continue
+            sel = QTextEdit.ExtraSelection()
+            cursor = edit.textCursor()
+            cursor.movePosition(QTextCursor.Start)
+            cursor.movePosition(QTextCursor.Down, i)
+            cursor.select(QTextCursor.LineUnderCursor)
+            sel.cursor = cursor
+            sel.format = fmt_add if st == "add" else fmt_del
+            extra.append(sel)
+        edit.setExtraSelections(extra)
+
+    def _swap(self):
+        self.left_text, self.right_text = self.right_text, self.left_text
+        self._render()
 
     def _finish(self, action: str):
         self.result_action = action
