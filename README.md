@@ -39,6 +39,10 @@ The UI is themed using a small set of tokens:
 - **Border radius:** `6px`
 - **Typography:** titles `18px`, labels `14px`, body text `13px`
 
+## Frameless window and acrylic
+
+The UI can run without the native window frame when `UI_FRAMELESS=true` (default). On macOS and Windows, enabling `UI_ACRYLIC=true` enables platform blur effects (Vibrancy or Mica). On other platforms or when disabled, the app falls back to a solid background.
+
 ## Two packaging modes
 - **Mode A (Monolith/Offline)**: put your `model.gguf` under `Resources/model.gguf` before packaging. The app ships fully offline.
 - **Mode B (Bootstrap)**: do not embed a model. On first run, the app downloads a GGUF from an internal URL defined in `bootstrap.py` and verifies SHA256.
