@@ -46,6 +46,7 @@ UI_COMPACT_MODE = str(os.getenv("UI_COMPACT_MODE", "false")).lower() in ("1", "t
 # ------------------------------------------------------------------
 UI_USE_FLUENT = str(os.getenv("UI_USE_FLUENT", "true")).lower() in ("1", "true", "yes", "on")
 UI_FRAMELESS = str(os.getenv("UI_FRAMELESS", "true")).lower() in ("1", "true", "yes", "on")
+UI_ACRYLIC = str(os.getenv("UI_ACRYLIC", "true")).lower() in ("1", "true", "yes", "on")
 UI_ENABLE_ANIMATIONS = str(os.getenv("UI_ENABLE_ANIMATIONS", "true")).lower() in ("1", "true", "yes", "on")
 
 # ------------------------------------------------------------------

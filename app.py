@@ -3,23 +3,34 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QTabWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QPlainTextEdit, QTextEdit, QLabel, QComboBox, QProgressBar,
     QCheckBox, QFileDialog, QSplitter, QFrame, QToolBar, QMenuBar, QMenu,
-    QDialog, QLineEdit, QListWidget, QListWidgetItem
+    QDialog, QLineEdit, QListWidget, QListWidgetItem, QGraphicsDropShadowEffect
 )
 from PySide6.QtCore import Qt, QObject, Signal, QThread, QTimer, QSettings
-from PySide6.QtGui import QShortcut, QKeySequence, QFont, QSyntaxHighlighter, QTextCharFormat, QAction, QIcon
+from PySide6.QtGui import QShortcut, QKeySequence, QFont, QSyntaxHighlighter, QTextCharFormat, QAction, QIcon, QColor
+
+import qtawesome as qta
+
+try:  # Frameless window support
+    from qframelesswindow import FramelessWindow
+    QF_AVAILABLE = True
+except Exception:  # pragma: no cover - library optional
+    FramelessWindow = QWidget  # type: ignore
+    QF_AVAILABLE = False
 
 from llm import LLM, CancelledError
 from prompts import SYSTEM_PROMPT, ETL_BLUEPRINT_TEMPLATE
 from config import (
     DEFAULT_SOURCE_DIALECT, DEFAULT_TARGET_DIALECT, DEFAULT_LINT_DIALECT,
     UI_DEFAULT_STREAM, UI_LOGS_OPEN, THEME,
-    UI_USE_FLUENT, UI_FRAMELESS, UI_ENABLE_ANIMATIONS,
+    UI_USE_FLUENT, UI_FRAMELESS, UI_ACRYLIC, UI_ENABLE_ANIMATIONS,
     ACCENT_COLOR, NEUTRALS, BORDER_RADIUS, SPACING, SPACING_HALF, FONT_SIZES
 )
 from tools.sql_tools import transpile_sql, lint_sql
 import sqlfluff
 import re
 import markdown
+
+BaseWindow = FramelessWindow if UI_FRAMELESS and QF_AVAILABLE else QWidget
 
 # --------------------------------------
 # Helpers
@@ -55,6 +66,19 @@ def show_toast(widget: QWidget, message: str, timeout_ms: int = 1200) -> None:
     except Exception:
         # Silent fail; toast is non-critical
         pass
+
+
+def apply_card_surface(widget: QWidget, theme: str) -> None:
+    """Give widget a card-like surface with shadow."""
+    palette = NEUTRALS.get(theme, NEUTRALS["light"])
+    widget.setStyleSheet(
+        f"background-color: {palette['surface']}; border: none; border-radius: {BORDER_RADIUS}px;"
+    )
+    effect = QGraphicsDropShadowEffect(widget)
+    effect.setBlurRadius(12)
+    effect.setOffset(0, 2)
+    effect.setColor(QColor(0, 0, 0, 40))
+    widget.setGraphicsEffect(effect)
 
 class SqlSyntaxHighlighter(QSyntaxHighlighter):
     """SQL syntax highlighter for code blocks."""
@@ -347,12 +371,12 @@ class CommandPalette(QDialog):
         self.setLayout(layout)
 
         self._actions = [
-            ("Send", "send"),
-            ("New Chat", "new_chat"),
-            ("Lint & Fix", "lint_fix"),
-            ("Transpile", "transpile"),
-            ("Toggle Theme", "toggle_theme"),
-            ("Export", "export"),
+            ("Send", "send", "fa5s.paper-plane"),
+            ("New Chat", "new_chat", "fa5s.comments"),
+            ("Lint & Fix", "lint_fix", "fa5s.magic"),
+            ("Transpile", "transpile", "fa5s.exchange-alt"),
+            ("Toggle Theme", "toggle_theme", "fa5s.adjust"),
+            ("Export", "export", "fa5s.file-export"),
         ]
         self._populate()
 
@@ -365,11 +389,15 @@ class CommandPalette(QDialog):
     def _populate(self):
         q = self.filter_edit.text().strip().lower()
         self.list_widget.clear()
-        for label, action_id in self._actions:
+        for label, action_id, icon_name in self._actions:
             hay = f"{label} {action_id}".lower()
             if not q or q in hay:
                 item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, action_id)
+                try:
+                    item.setIcon(qta.icon(icon_name))
+                except Exception:
+                    pass
                 self.list_widget.addItem(item)
         if self.list_widget.count() > 0:
             self.list_widget.setCurrentRow(0)
@@ -454,8 +482,10 @@ class ChatTab(QWidget):
 
         # Buttons (aligned right)
         self.btn_chat = QPushButton("Send"); self.btn_chat.setToolTip("Send message (⌘↩)")
+        self.btn_chat.setIcon(qta.icon("fa5s.paper-plane"))
         self.btn_chat.setMinimumHeight(32)
         self.btn_etl = QPushButton("ETL Blueprint")
+        self.btn_etl.setIcon(qta.icon("fa5s.project-diagram"))
         self.btn_etl.setToolTip("Generate ETL blueprint using input as context")
         self.btn_etl.setMinimumHeight(32)
         self.btn_chat.clicked.connect(self.on_chat)
@@ -477,6 +507,7 @@ class ChatTab(QWidget):
         self.btn_new_chat = QPushButton("New Chat"); self.btn_new_chat.setToolTip("Reset history (⌘N)")
         self.btn_new_chat.setMinimumHeight(28)
         self.btn_export = QPushButton("Export"); self.btn_export.setToolTip("Export transcript to .txt")
+        self.btn_export.setIcon(qta.icon("fa5s.file-export"))
         self.btn_export.setMinimumHeight(28)
         self.btn_copy_out.clicked.connect(self.copy_output)
         self.btn_clear_out.clicked.connect(lambda: self.output.clear_content())
@@ -501,6 +532,10 @@ class ChatTab(QWidget):
         self.logs = QPlainTextEdit(); self.logs.setReadOnly(True)
         self.logs.setMaximumHeight(120)
         self.logs.setVisible(bool(persisted_logs_open))
+
+        # Card surfaces
+        apply_card_surface(self.output, initial_theme)
+        apply_card_surface(self.logs, initial_theme)
 
         # Shortcuts
         for seq in ("Ctrl+Return", "Ctrl+Enter", "Meta+Return", "Meta+Enter"):
@@ -587,6 +622,8 @@ class ChatTab(QWidget):
         theme = "dark" if checked else "light"
         self.settings.setValue("ui/theme", theme)
         self.apply_theme(theme)
+        apply_card_surface(self.output, theme)
+        apply_card_surface(self.logs, theme)
     
     def create_quick_actions(self):
         """Create quick action buttons for common operations."""
@@ -997,15 +1034,18 @@ class SqlTab(QWidget):
         self.sql_out.setMinimumHeight(200)
         self.sql_out.setPlaceholderText("Output will appear here…")
         self.sql_out_highlighter = SqlSyntaxHighlighter(self.sql_out.document())
+        apply_card_surface(self.sql_out, THEME)
 
         # Action buttons
         self.btn_transpile = QPushButton("Transpile")
         self.btn_transpile.setMinimumHeight(32)
         self.btn_transpile.setToolTip("Convert SQL between dialects")
+        self.btn_transpile.setIcon(qta.icon("fa5s.exchange-alt"))
         
         self.btn_lint = QPushButton("Lint & Fix")
         self.btn_lint.setMinimumHeight(32)
         self.btn_lint.setToolTip("Check SQL for issues and suggest fixes")
+        self.btn_lint.setIcon(qta.icon("fa5s.magic"))
         
         self.btn_format = QPushButton("Format")
         self.btn_format.setMinimumHeight(32)
@@ -1014,6 +1054,7 @@ class SqlTab(QWidget):
         self.btn_copy_out = QPushButton("Copy Output")
         self.btn_copy_out.setMinimumHeight(32)
         self.btn_copy_out.setToolTip("Copy output to clipboard")
+        self.btn_copy_out.setIcon(qta.icon("fa5s.copy"))
 
         self.btn_transpile.clicked.connect(self.on_transpile)
         self.btn_lint.clicked.connect(self.on_lint)
@@ -1154,14 +1195,25 @@ class SqlTab(QWidget):
         QApplication.clipboard().setText(output)
         self.set_status("Output copied to clipboard")
 
-class MainWindow(QWidget):
+class MainWindow(BaseWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("VisionBI AI (Offline)")
         self.resize(980, 720)
 
-        # Feature flag: optional frameless window
-        if UI_FRAMELESS:
+        # Feature flag: optional frameless window using qframelesswindow
+        if UI_FRAMELESS and QF_AVAILABLE:
+            from widgets.titlebar import TitleBar as CustomTitleBar
+            self.setTitleBar(CustomTitleBar(self))
+            if UI_ACRYLIC:
+                try:
+                    self.setMicaEffectEnabled(True)
+                except Exception:
+                    try:
+                        self.setAcrylicEffectEnabled(True)
+                    except Exception:
+                        pass
+        elif UI_FRAMELESS:
             self.setWindowFlag(Qt.FramelessWindowHint, True)
 
         # Settings
@@ -1583,6 +1635,8 @@ class DiffDialog(QDialog):
 
         left = QPlainTextEdit(); left.setReadOnly(True); left.setPlainText(original_text)
         right = QPlainTextEdit(); right.setReadOnly(True); right.setPlainText(transformed_text)
+        apply_card_surface(left, THEME)
+        apply_card_surface(right, THEME)
         font = QFont("Monospace"); font.setStyleHint(QFont.TypeWriter)
         left.setFont(font); right.setFont(font)
         left.setLineWrapMode(QPlainTextEdit.NoWrap); right.setLineWrapMode(QPlainTextEdit.NoWrap)
