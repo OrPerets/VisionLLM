@@ -27,6 +27,18 @@ python app.py
 
 > If you do not have GPU acceleration, omit the Metal/CUBLAS flags (CPU will still work, just slower).
 
+## Design Tokens
+
+The UI is themed using a small set of tokens:
+
+- **Accent color:** `#2563eb`
+- **Neutral palette:**
+  - Light background `#ffffff`, surface `#f8f9fa`, text `#1f2937`
+  - Dark background `#1f2937`, surface `#374151`, text `#f9fafb`
+- **Spacing:** base `8px` with `4px` sub-step
+- **Border radius:** `6px`
+- **Typography:** titles `18px`, labels `14px`, body text `13px`
+
 ## Two packaging modes
 - **Mode A (Monolith/Offline)**: put your `model.gguf` under `Resources/model.gguf` before packaging. The app ships fully offline.
 - **Mode B (Bootstrap)**: do not embed a model. On first run, the app downloads a GGUF from an internal URL defined in `bootstrap.py` and verifies SHA256.

@@ -40,4 +40,43 @@ UI_LOGS_OPEN = str(os.getenv("UI_LOGS_OPEN", "false")).lower() in ("1", "true", 
 THEME = str(os.getenv("THEME", "light")).lower() if str(os.getenv("THEME", "light")).lower() in ("light", "dark") else "light"
 # UI Polish flags
 UI_COMPACT_MODE = str(os.getenv("UI_COMPACT_MODE", "false")).lower() in ("1", "true", "yes", "on")
-UI_ANIMATION_ENABLED = str(os.getenv("UI_ANIMATION_ENABLED", "true")).lower() in ("1", "true", "yes", "on")
+
+# ------------------------------------------------------------------
+# Feature flags for upcoming UI work
+# ------------------------------------------------------------------
+UI_USE_FLUENT = str(os.getenv("UI_USE_FLUENT", "true")).lower() in ("1", "true", "yes", "on")
+UI_FRAMELESS = str(os.getenv("UI_FRAMELESS", "true")).lower() in ("1", "true", "yes", "on")
+UI_ENABLE_ANIMATIONS = str(os.getenv("UI_ENABLE_ANIMATIONS", "true")).lower() in ("1", "true", "yes", "on")
+
+# ------------------------------------------------------------------
+# Design tokens
+# ------------------------------------------------------------------
+ACCENT_COLOR = "#2563eb"
+
+NEUTRALS = {
+    "light": {
+        "background": "#ffffff",
+        "surface": "#f8f9fa",
+        "text": "#1f2937",
+        "text_muted": "#6b7280",
+        "border": "#e5e7eb",
+    },
+    "dark": {
+        "background": "#1f2937",
+        "surface": "#374151",
+        "text": "#f9fafb",
+        "text_muted": "#d1d5db",
+        "border": "#4b5563",
+    },
+}
+
+BORDER_RADIUS = 6
+SPACING = 8
+SPACING_HALF = 4
+
+FONT_SIZES = {
+    "title": 18,
+    "label": 14,
+    "body": 13,
+}
+
