@@ -3,9 +3,10 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QTabWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QPlainTextEdit, QTextEdit, QLabel, QComboBox, QProgressBar,
     QCheckBox, QFileDialog, QSplitter, QFrame, QToolBar, QMenuBar, QMenu,
-    QDialog, QDialogButtonBox, QLineEdit, QListWidget, QListWidgetItem, QGraphicsDropShadowEffect
+    QDialog, QDialogButtonBox, QLineEdit, QListWidget, QListWidgetItem, QGraphicsDropShadowEffect,
+    QGraphicsOpacityEffect
 )
-from PySide6.QtCore import Qt, QObject, Signal, QThread, QTimer, QSettings, QPropertyAnimation
+from PySide6.QtCore import Qt, QObject, Signal, QThread, QTimer, QSettings, QPropertyAnimation, QPoint, Property
 from PySide6.QtGui import (
     QShortcut, QKeySequence, QFont, QSyntaxHighlighter, QTextCharFormat,
     QAction, QIcon, QColor, QTextCursor
@@ -43,33 +44,63 @@ BaseWindow = FramelessWindow if UI_FRAMELESS and QF_AVAILABLE else QWidget
 # Helpers
 # --------------------------------------
 
-def show_toast(widget: QWidget, message: str, timeout_ms: int = 1200) -> None:
+def show_toast(widget: QWidget, message: str, timeout_ms: int = 1200, icon: str | None = None) -> None:
     """Show a small non-blocking toast label near widget's top-right."""
     try:
-        label = QLabel(message, widget)
-        label.setStyleSheet(
+        container = QWidget(widget)
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(6)
+        if icon:
+            try:
+                icon_lbl = QLabel()
+                icon_lbl.setPixmap(qta.icon(icon, color="#ffffff").pixmap(14, 14))
+                layout.addWidget(icon_lbl)
+            except Exception:
+                pass
+        text_lbl = QLabel(message)
+        layout.addWidget(text_lbl)
+        container.setStyleSheet(
             """
-            QLabel {
-                background-color: rgba(60, 60, 60, 210);
-                color: #ffffff;
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 12px;
-            }
+            background-color: rgba(60, 60, 60, 210);
+            color: #ffffff;
+            border-radius: 6px;
+            font-size: 12px;
             """
         )
-        label.adjustSize()
-        # Position near top-right within parent widget
+        container.adjustSize()
         margin = 12
-        x = max(0, widget.width() - label.width() - margin)
+        x = max(0, widget.width() - container.width() - margin)
         y = margin
-        label.move(x, y)
-        label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        label.show()
+        container.move(x, y)
+        container.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        container.show()
         if UI_ENABLE_ANIMATIONS:
-            QTimer.singleShot(timeout_ms, label.deleteLater)
+            op = QGraphicsOpacityEffect(container)
+            container.setGraphicsEffect(op)
+            fade_in = QPropertyAnimation(op, b"opacity")
+            fade_in.setDuration(180)
+            fade_in.setStartValue(0.0)
+            fade_in.setEndValue(1.0)
+            slide = QPropertyAnimation(container, b"pos")
+            slide.setDuration(180)
+            slide.setStartValue(QPoint(x, y - 10))
+            slide.setEndValue(QPoint(x, y))
+            fade_in.start()
+            slide.start()
+
+            def _close():
+                fade_out = QPropertyAnimation(op, b"opacity")
+                fade_out.setDuration(180)
+                fade_out.setStartValue(1.0)
+                fade_out.setEndValue(0.0)
+                fade_out.finished.connect(container.deleteLater)
+                fade_out.start()
+
+            QTimer.singleShot(timeout_ms, _close)
+            container._anims = (fade_in, slide)  # prevent GC
         else:
-            QTimer.singleShot(timeout_ms, lambda: label.hide())
+            QTimer.singleShot(timeout_ms, container.deleteLater)
     except Exception:
         # Silent fail; toast is non-critical
         pass
@@ -86,6 +117,84 @@ def apply_card_surface(widget: QWidget, theme: str) -> None:
     effect.setOffset(0, 2)
     effect.setColor(QColor(0, 0, 0, 40))
     widget.setGraphicsEffect(effect)
+
+
+class AnimatedButton(QPushButton):
+    """Button with hover/press animations and focus ring."""
+
+    def __init__(self, text: str = "", parent: QWidget | None = None):
+        super().__init__(text, parent)
+        self._base = QColor(ACCENT_COLOR)
+        self._current = self._base
+        self._bg_anim = QPropertyAnimation(self, b"bgColor")
+        self._bg_anim.setDuration(180)
+        self._focus_effect = QGraphicsDropShadowEffect(self)
+        self._focus_effect.setOffset(0, 0)
+        self._focus_effect.setColor(QColor(ACCENT_COLOR))
+        self._focus_effect.setBlurRadius(0)
+        self.setGraphicsEffect(self._focus_effect)
+        self.setBgColor(self._base)
+
+    def getBgColor(self) -> QColor:
+        return self._current
+
+    def setBgColor(self, color: QColor) -> None:
+        self._current = color
+        self.setStyleSheet(
+            f"color: #ffffff; background-color: {color.name()}; "
+            f"border: none; border-radius: {BORDER_RADIUS}px; padding: 6px 12px;"
+        )
+
+    bgColor = Property(QColor, getBgColor, setBgColor)
+
+    def _animate_bg(self, target: QColor) -> None:
+        if UI_ENABLE_ANIMATIONS:
+            self._bg_anim.stop()
+            self._bg_anim.setStartValue(self._current)
+            self._bg_anim.setEndValue(target)
+            self._bg_anim.start()
+        else:
+            self.setBgColor(target)
+
+    def enterEvent(self, e):
+        self._animate_bg(self._base.lighter(110))
+        return super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._animate_bg(self._base)
+        return super().leaveEvent(e)
+
+    def mousePressEvent(self, e):
+        self._animate_bg(self._base.darker(110))
+        return super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        self._animate_bg(self._base)
+        return super().mouseReleaseEvent(e)
+
+    def focusInEvent(self, e):
+        if UI_ENABLE_ANIMATIONS:
+            anim = QPropertyAnimation(self._focus_effect, b"blurRadius", self)
+            anim.setDuration(150)
+            anim.setStartValue(self._focus_effect.blurRadius())
+            anim.setEndValue(10)
+            anim.start()
+            self._focus_anim = anim
+        else:
+            self._focus_effect.setBlurRadius(10)
+        return super().focusInEvent(e)
+
+    def focusOutEvent(self, e):
+        if UI_ENABLE_ANIMATIONS:
+            anim = QPropertyAnimation(self._focus_effect, b"blurRadius", self)
+            anim.setDuration(150)
+            anim.setStartValue(self._focus_effect.blurRadius())
+            anim.setEndValue(0)
+            anim.start()
+            self._focus_anim = anim
+        else:
+            self._focus_effect.setBlurRadius(0)
+        return super().focusOutEvent(e)
 
 class SqlSyntaxHighlighter(QSyntaxHighlighter):
     """SQL syntax highlighter for code blocks."""
@@ -377,18 +486,34 @@ class CommandPalette(QDialog):
 
         self.setLayout(layout)
 
-        self._actions = [
-            ("Send", "send", "fa5s.paper-plane"),
-            ("New Chat", "new_chat", "fa5s.comments"),
-            ("Lint & Fix", "lint_fix", "fa5s.magic"),
-            ("Transpile", "transpile", "fa5s.exchange-alt"),
-            ("Toggle Theme", "toggle_theme", "fa5s.adjust"),
-            ("Export", "export", "fa5s.file-export"),
-        ]
+        parent_chat = parent if isinstance(parent, QWidget) else None
+        self._actions = {
+            "Chat": [
+                ("Send", "send", "fa5s.paper-plane", None),
+                ("New Chat", "new_chat", "fa5s.comments", None),
+            ],
+            "SQL": [
+                ("Lint & Fix", "lint_fix", "fa5s.magic", None),
+                ("Transpile", "transpile", "fa5s.exchange-alt", None),
+            ],
+            "View": [
+                (
+                    "Toggle Theme",
+                    "toggle_theme",
+                    "fa5s.adjust",
+                    (lambda: "Dark" if getattr(parent_chat, "theme_toggle", None) and parent_chat.theme_toggle.isChecked() else "Light"),
+                ),
+            ],
+            "Export": [
+                ("Export", "export", "fa5s.file-export", None),
+            ],
+        }
+        self._preview_map = {}
         self._populate()
 
         self.filter_edit.textChanged.connect(self._populate)
         self.list_widget.itemDoubleClicked.connect(self._trigger_item)
+        self.list_widget.currentRowChanged.connect(lambda *_: self._refresh_previews())
 
         # Keyboard navigation handled by default; Enter triggers
         self.filter_edit.returnPressed.connect(self._trigger_current)
@@ -396,18 +521,65 @@ class CommandPalette(QDialog):
     def _populate(self):
         q = self.filter_edit.text().strip().lower()
         self.list_widget.clear()
-        for label, action_id, icon_name in self._actions:
-            hay = f"{label} {action_id}".lower()
-            if not q or q in hay:
-                item = QListWidgetItem(label)
+        self._preview_map.clear()
+        for section, actions in self._actions.items():
+            filtered = []
+            for label, action_id, icon_name, preview in actions:
+                hay = f"{label} {action_id}".lower()
+                if not q or q in hay:
+                    filtered.append((label, action_id, icon_name, preview))
+            if not filtered:
+                continue
+            header = QListWidgetItem(section)
+            header.setFlags(Qt.NoItemFlags)
+            header.setData(Qt.ForegroundRole, QColor("#6b7280"))
+            font = header.font()
+            font.setBold(True)
+            header.setFont(font)
+            self.list_widget.addItem(header)
+            for label, action_id, icon_name, preview in filtered:
+                item = QListWidgetItem()
                 item.setData(Qt.UserRole, action_id)
+                row = QWidget()
+                lay = QHBoxLayout(row)
+                lay.setContentsMargins(4, 2, 4, 2)
+                lay.setSpacing(8)
                 try:
-                    item.setIcon(qta.icon(icon_name))
+                    icon = qta.icon(icon_name)
+                    icon_lbl = QLabel()
+                    icon_lbl.setPixmap(icon.pixmap(16, 16))
+                    lay.addWidget(icon_lbl)
                 except Exception:
                     pass
+                text_lbl = QLabel()
+                text_lbl.setTextFormat(Qt.RichText)
+                disp = label
+                if q:
+                    disp = re.sub(
+                        f"({re.escape(q)})",
+                        fr"<span style='color:{ACCENT_COLOR}; font-weight:600;'>\1</span>",
+                        label,
+                        flags=re.I,
+                    )
+                text_lbl.setText(disp)
+                lay.addWidget(text_lbl)
+                lay.addStretch(1)
+                prev_lbl = QLabel()
+                prev_lbl.setStyleSheet("color: #6b7280;")
+                if preview:
+                    try:
+                        prev_lbl.setText(str(preview()))
+                    except Exception:
+                        prev_lbl.setText("?")
+                    self._preview_map[action_id] = (prev_lbl, preview)
+                lay.addWidget(prev_lbl)
                 self.list_widget.addItem(item)
-        if self.list_widget.count() > 0:
-            self.list_widget.setCurrentRow(0)
+                self.list_widget.setItemWidget(item, row)
+                item.setSizeHint(row.sizeHint())
+        for i in range(self.list_widget.count()):
+            if self.list_widget.item(i).flags() & Qt.ItemIsEnabled:
+                self.list_widget.setCurrentRow(i)
+                break
 
     def _trigger_current(self):
         item = self.list_widget.currentItem()
@@ -419,6 +591,13 @@ class CommandPalette(QDialog):
         action_id = str(item.data(Qt.UserRole))
         self.triggered.emit(action_id)
         self.accept()
+
+    def _refresh_previews(self):
+        for lbl, func in self._preview_map.values():
+            try:
+                lbl.setText(str(func()))
+            except Exception:
+                lbl.clear()
 
 class ChatTab(QWidget):
     def __init__(self, llm: LLM, set_status_callback=None, apply_theme_callback=None, initial_theme: str = THEME):
@@ -488,10 +667,10 @@ class ChatTab(QWidget):
         self.input.setMaximumHeight(120)
 
         # Buttons (aligned right)
-        self.btn_chat = QPushButton("Send"); self.btn_chat.setToolTip("Send message (⌘↩)")
+        self.btn_chat = AnimatedButton("Send"); self.btn_chat.setToolTip("Send message (⌘↩)")
         self.btn_chat.setIcon(qta.icon("fa5s.paper-plane"))
         self.btn_chat.setMinimumHeight(32)
-        self.btn_etl = QPushButton("ETL Blueprint")
+        self.btn_etl = AnimatedButton("ETL Blueprint")
         self.btn_etl.setIcon(qta.icon("fa5s.project-diagram"))
         self.btn_etl.setToolTip("Generate ETL blueprint using input as context")
         self.btn_etl.setMinimumHeight(32)
@@ -503,19 +682,25 @@ class ChatTab(QWidget):
         self.output = MessageList()
         self.empty_label = QLabel("Start a conversation by sending a prompt.")
         self.empty_label.setAlignment(Qt.AlignCenter)
-        self.progress = QProgressBar(); self.progress.setRange(0, 0); self.progress.setVisible(False)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setVisible(False)
         self.progress.setToolTip("Thinking…")
-        self.progress.setMaximumHeight(4)
+        self.progress.setFixedHeight(3)
         self.progress.setTextVisible(False)
+        self.progress.setStyleSheet(
+            f"QProgressBar {{background-color: transparent; border: none;}}"
+            f"QProgressBar::chunk {{background-color: {ACCENT_COLOR}; border-radius: 1px;}}"
+        )
 
         # Output controls
-        self.btn_copy_out = QPushButton("Copy"); self.btn_copy_out.setToolTip("Copy response to clipboard")
+        self.btn_copy_out = AnimatedButton("Copy"); self.btn_copy_out.setToolTip("Copy response to clipboard")
         self.btn_copy_out.setMinimumHeight(28)
-        self.btn_clear_out = QPushButton("Clear"); self.btn_clear_out.setToolTip("Clear response")
+        self.btn_clear_out = AnimatedButton("Clear"); self.btn_clear_out.setToolTip("Clear response")
         self.btn_clear_out.setMinimumHeight(28)
-        self.btn_new_chat = QPushButton("New Chat"); self.btn_new_chat.setToolTip("Reset history (⌘N)")
+        self.btn_new_chat = AnimatedButton("New Chat"); self.btn_new_chat.setToolTip("Reset history (⌘N)")
         self.btn_new_chat.setMinimumHeight(28)
-        self.btn_export = QPushButton("Export"); self.btn_export.setToolTip("Export transcript to .txt")
+        self.btn_export = AnimatedButton("Export"); self.btn_export.setToolTip("Export transcript to .txt")
         self.btn_export.setIcon(qta.icon("fa5s.file-export"))
         self.btn_export.setMinimumHeight(28)
         self.btn_copy_out.clicked.connect(self.copy_output)
@@ -596,13 +781,13 @@ class ChatTab(QWidget):
 
         # Logs drawer
         persisted_logs_open = bool(self.settings.value("ui/logs_open", UI_LOGS_OPEN, type=bool))
-        self.logs_toggle = QPushButton("Hide Logs" if persisted_logs_open else "Show Logs")
+        self.logs_toggle = AnimatedButton("Hide Logs" if persisted_logs_open else "Show Logs")
         self.logs_toggle.setCheckable(True)
         self.logs_toggle.setChecked(bool(persisted_logs_open))
         self.logs_toggle.setToolTip("Toggle request/response metrics")
         self.logs_toggle.setMinimumHeight(28)
         self.logs_toggle.toggled.connect(self.toggle_logs)
-        self.btn_copy_logs = QPushButton("Copy Logs")
+        self.btn_copy_logs = AnimatedButton("Copy Logs")
         self.btn_copy_logs.setMinimumHeight(28)
         self.btn_copy_logs.clicked.connect(self.copy_logs)
         logs_header = QHBoxLayout(); logs_header.setSpacing(8)
@@ -1167,21 +1352,21 @@ class SqlTab(QWidget):
         apply_card_surface(self.sql_out, THEME)
 
         # Action buttons
-        self.btn_transpile = QPushButton("Transpile")
+        self.btn_transpile = AnimatedButton("Transpile")
         self.btn_transpile.setMinimumHeight(32)
         self.btn_transpile.setToolTip("Convert SQL between dialects")
         self.btn_transpile.setIcon(qta.icon("fa5s.exchange-alt"))
         
-        self.btn_lint = QPushButton("Lint & Fix")
+        self.btn_lint = AnimatedButton("Lint & Fix")
         self.btn_lint.setMinimumHeight(32)
         self.btn_lint.setToolTip("Check SQL for issues and suggest fixes")
         self.btn_lint.setIcon(qta.icon("fa5s.magic"))
         
-        self.btn_format = QPushButton("Format")
+        self.btn_format = AnimatedButton("Format")
         self.btn_format.setMinimumHeight(32)
         self.btn_format.setToolTip("Format SQL with consistent style")
         
-        self.btn_copy_out = QPushButton("Copy Output")
+        self.btn_copy_out = AnimatedButton("Copy Output")
         self.btn_copy_out.setMinimumHeight(32)
         self.btn_copy_out.setToolTip("Copy output to clipboard")
         self.btn_copy_out.setIcon(qta.icon("fa5s.copy"))
