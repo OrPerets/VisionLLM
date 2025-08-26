@@ -4,3 +4,6 @@ sqlglot==25.6.0
 sqlfluff==3.1.0
 ollama>=0.4.2
 markdown>=3.7
+qfluentwidgets>=1.4.6
+qtawesome>=1.2.4
+qframelesswindow>=1.6.3
