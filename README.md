@@ -1,66 +1,72 @@
-# VisionBI Internal AI App — GGUF Desktop Scaffold (PySide6 + llama.cpp)
+## VisionBI In-House AI Assistant — Web (FastAPI + Next.js + TGI)
 
-This is a **ready-to-run** desktop scaffold that bundles a local LLM (GGUF) using `llama-cpp-python` and provides:
-- Chat tab with a VisionBI-tuned system prompt
-- SQL Tools: **Transpile** (via `sqlglot`) and **Lint & Fix** (via `sqlfluff`)
-- Optional bootstrap to download the GGUF on first run
+This repository now delivers a production-ready, on‑prem web AI assistant with:
+- FastAPI backend with SSE streaming, projects/conversations/messages, SQL tools.
+- Hugging Face Text Generation Inference (TGI) model server that loads once and is shared.
+- Next.js frontend with modern UX (chat UI, code toolbar, logs, diff viewer, preferences).
+- Docker Compose stack: `tgi`, `api`, `db`, `web`.
 
-## Quickstart (macOS Apple Silicon)
+### Dev Quickstart (Docker, recommended)
+```bash
+make dev-up          # builds and runs db, tgi, api, web
+make logs            # follow logs
+# Open http://localhost:3000
+
+# Tear down
+make dev-down
+```
+
+Environment defaults are embedded in `infra/docker-compose.yml`. To override, export env vars (e.g., `MODEL_ID`).
+
+### Dev Quickstart (Backend only, local)
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-python -m pip install --upgrade pip wheel
-CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python==0.2.90
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-python app.py
+
+# Start backend on :8000 (expects TGI at http://localhost:8080)
+make backend-dev
 ```
 
-## Quickstart (Windows)
-```bat
-python -m venv .venv && .venv\Scripts\activate
-python -m pip install --upgrade pip wheel
-set CMAKE_ARGS=-DLLAMA_CUBLAS=on
-set FORCE_CMAKE=1
-pip install llama-cpp-python==0.2.90
-pip install -r requirements.txt
-python app.py
-```
+### Directory Layout
+- `backend/`: FastAPI app, models, routers, services, Alembic, tests
+- `infra/`: docker-compose, volumes
+- `tools/sql_tools.py`: SQL transpile and lint/fix used by the API
+- `frontend/`: Next.js app (added in this migration)
+- `docs/`: RUNBOOK and DEPLOY guides
 
-> If you do not have GPU acceleration, omit the Metal/CUBLAS flags (CPU will still work, just slower).
+### Configuration
+Backend env (can be set in container or shell):
+- `DATABASE_URL` (default: Postgres in compose)
+- `MODEL_SERVER_URL` (default: http://tgi:8080)
+- `DEFAULT_MODEL_ID` (default: meta-llama/Meta-Llama-3.1-8B-Instruct)
+- `CORS_ORIGIN` (default: http://localhost:3000)
+- `TEMPERATURE`, `MAX_TOKENS`
 
-## Design Tokens
+TGI env:
+- `MODEL_ID` (default: meta-llama/Meta-Llama-3.1-8B-Instruct)
+- `MAX_INPUT_TOKENS`, `MAX_TOTAL_TOKENS` (default: 8192)
 
-The UI is themed using a small set of tokens:
+### API Endpoints (high-level)
+- `GET /api/health`, `GET /api/meta`
+- Projects CRUD: `/api/projects`
+- Conversations CRUD: `/api/projects/:id/conversations`, `/api/conversations/:id`
+- Messages list: `/api/conversations/:id/messages`
+- Chat SSE: `POST /api/chat/stream`
+- SQL tools: `/api/sql/transpile`, `/api/sql/lint`
 
-- **Accent color:** `#2563eb`
-- **Neutral palette:**
-  - Light background `#ffffff`, surface `#f8f9fa`, text `#1f2937`
-  - Dark background `#1f2937`, surface `#374151`, text `#f9fafb`
-- **Spacing:** base `8px` with `4px` sub-step
-- **Border radius:** `6px`
-- **Typography:** titles `18px`, labels `14px`, body text `13px`
+### On‑prem Deploy (summary)
+1) Provision a Docker host with GPU if desired (TGI benefits from GPU).
+2) Prepare a persistent volume for `hf_cache` to ensure one‑time model download.
+3) Set `MODEL_ID` and other envs as needed.
+4) `docker compose -f infra/docker-compose.yml up -d`.
+5) Point users to the internal URL of the `web` service.
 
-## Frameless window and acrylic
+See `docs/DEPLOY.md` for detailed on‑prem guidance and cache pre-seeding.
 
-The UI can run without the native window frame when `UI_FRAMELESS=true` (default). On macOS and Windows, enabling `UI_ACRYLIC=true` enables platform blur effects (Vibrancy or Mica). On other platforms or when disabled, the app falls back to a solid background.
+### SQL Tools parity
+The backend reuses the existing `tools/sql_tools.py` for transpile and lint/fix to preserve behavior.
 
-## Two packaging modes
-- **Mode A (Monolith/Offline)**: put your `model.gguf` under `Resources/model.gguf` before packaging. The app ships fully offline.
-- **Mode B (Bootstrap)**: do not embed a model. On first run, the app downloads a GGUF from an internal URL defined in `bootstrap.py` and verifies SHA256.
+### Design tokens
+Preserved from the desktop app (accent `#2563eb`, neutrals, spacing, radius, font sizes) and applied in the web UI.
 
-## Packaging (PyInstaller)
-macOS:
-```bash
-pyinstaller --noconfirm --windowed       --name "VisionBI-AI"       --add-data "Resources/model.gguf:Resources"       app.py
-```
-Windows:
-```bat
-pyinstaller --noconfirm --windowed ^
-  --name VisionBI-AI ^
-  --add-data "Resources\model.gguf;Resources" ^
-  app.py
-```
-
-## Notes
-- Place a GGUF file at `Resources/model.gguf` (Mode A), or configure `bootstrap.py` for Mode B.
-- Check the model's license allows redistribution.
-- Configure `sqlfluff` rules if you have internal SQL conventions.
