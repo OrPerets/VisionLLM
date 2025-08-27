@@ -3,10 +3,10 @@ PYTHON ?= python3
 .PHONY: dev run test fmt lint migrate revision seed
 
 dev:
-	uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	PYTHONPATH=.. $(PYTHON) -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 run:
-	uvicorn app.main:app --host 0.0.0.0 --port 8000
+	PYTHONPATH=.. $(PYTHON) -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 test:
 	$(PYTHON) -m pytest

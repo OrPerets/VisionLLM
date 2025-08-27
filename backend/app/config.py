@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -30,9 +31,20 @@ class Settings(BaseSettings):
     temperature: float = Field(0.2, env="TEMPERATURE")
     max_tokens: int = Field(800, env="MAX_TOKENS")
 
-    class Config:
-        env_file = ".env.api"
-        case_sensitive = False
+    # Backend selection: 'tgi' or 'ollama'
+    model_backend: str = Field("tgi", env="MODEL_BACKEND")
+
+    # Ollama settings for local POC on macOS
+    ollama_url: str = Field("http://host.docker.internal:11434", env="OLLAMA_URL")
+    ollama_model: str = Field("llama3.2:3b-instruct", env="OLLAMA_MODEL")
+
+    # Pydantic v2 config
+    model_config = SettingsConfigDict(
+        env_file=".env.api",
+        case_sensitive=False,
+        # Allow fields that start with `model_` (e.g., model_server_url)
+        protected_namespaces=(),
+    )
 
 
 @lru_cache()

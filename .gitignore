@@ -1,0 +1,105 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# OS/Editor junk
+.vscode/
+.idea/
+*.swp
+*.swo
+*.orig
+*.bak
+*.tmp
+
+# Logs and pids
+logs/
+*.log
+*.pid
+*.seed
+*.out
+
+# Environment files (keep examples)
+.env
+.env.*
+!*.example
+!**/*.example
+backend/.env*
+frontend/.env*
+infra/env.tgi
+
+# Python cache/artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Python packaging
+build/
+dist/
+downloads/
+wheels/
+*.egg-info/
+.eggs/
+sdist/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+.venv*/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv311/
+
+# Testing/Coverage
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# Type checking / lint caches
+.mypy_cache/
+.ruff_cache/
+dmypy.json
+.dmypy.json
+
+# Databases & local data
+*.db
+*.sqlite3
+backend/visionbi.db
+
+# Node/JS
+node_modules/
+frontend/node_modules/
+*.tsbuildinfo
+
+# Next.js
+.next/
+frontend/.next/
+out/
+frontend/out/
+.turbo/
+frontend/.turbo/
+.vercel/
+frontend/.vercel/
+
+# Build artifacts
+*.map
+
+# Model / large artifacts
+Resources/*.gguf
+Resources/*.bin
+Resources/*.pt
+
+# Docker (local)
+**/.docker/
+

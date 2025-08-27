@@ -42,6 +42,11 @@ class Project(Base):
 
     conversations = relationship("Conversation", back_populates="project", cascade="all, delete-orphan")
 
+    # Expose defaults_json as `defaults` for API serialization
+    @property
+    def defaults(self) -> Optional[dict]:
+        return self.defaults_json
+
 
 class Conversation(Base):
     __tablename__ = "conversations"

@@ -15,17 +15,26 @@ async def health() -> dict[str, bool]:
 
 @router.get("/meta")
 async def meta() -> dict[str, str | bool]:
-    tgi_ok = False
+    backend = settings.model_backend.lower()
+    ok = False
+    model_id = settings.default_model_id
     try:
         async with httpx.AsyncClient(timeout=2) as client:
-            r = await client.get(f"{settings.model_server_url}/health")
-            tgi_ok = r.status_code == 200
+            if backend == "ollama":
+                # Ollama health: version endpoint
+                r = await client.get(f"{settings.ollama_url}/api/version")
+                ok = r.status_code == 200
+                model_id = settings.ollama_model
+            else:
+                r = await client.get(f"{settings.model_server_url}/health")
+                ok = r.status_code == 200
     except Exception:
-        tgi_ok = False
+        ok = False
     return {
         "backend_version": "0.1.0",
-        "model_server_ok": tgi_ok,
-        "model_id": settings.default_model_id,
+        "backend": backend,
+        "model_server_ok": ok,
+        "model_id": model_id,
     }
 
 

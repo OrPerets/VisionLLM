@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 
 
 class Meta(BaseModel):
@@ -11,6 +12,8 @@ class Meta(BaseModel):
     usage: dict[str, int] | None = None
     backend: str | None = None
     model_id: str | None = None
+    # Allow field names starting with `model_` without warnings
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class UserRead(BaseModel):
@@ -18,8 +21,7 @@ class UserRead(BaseModel):
     email: Optional[str]
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProjectCreate(BaseModel):
@@ -43,8 +45,7 @@ class ProjectRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationCreate(BaseModel):
@@ -58,8 +59,7 @@ class ConversationRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageRead(BaseModel):
@@ -70,8 +70,7 @@ class MessageRead(BaseModel):
     meta_json: Optional[dict[str, Any]]
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatStreamRequest(BaseModel):

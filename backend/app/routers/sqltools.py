@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from ..schemas import SQLTranspileRequest, SQLTranspileResponse, SQLLintRequest, SQLLintResponse
 
 # Reuse existing implementations
-from ...tools.sql_tools import transpile_sql, lint_sql
+from tools.sql_tools import transpile_sql, lint_sql
 
 
 router = APIRouter(prefix="/sql", tags=["sql"])

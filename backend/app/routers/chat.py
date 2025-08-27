@@ -14,6 +14,7 @@ from .. import models
 from ..schemas import ChatStreamRequest
 from ..config import settings
 from ..services.tgi_client import client as tgi
+from ..services.tgi_client import ollama_client
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -72,7 +73,15 @@ async def event_stream(request: ChatStreamRequest, db: Session) -> AsyncGenerato
     num_tokens = 0
     collected_text: List[str] = []
 
-    async for item in tgi.stream_generate(prompt, temperature=temperature, max_new_tokens=max_tokens):
+    # Choose backend: ollama for fastest local POC on macOS, otherwise TGI
+    backend = "ollama" if settings.model_backend.lower() == "ollama" else "tgi"
+    generator = (
+        ollama_client.stream_generate(prompt, temperature=temperature, max_new_tokens=max_tokens)
+        if backend == "ollama"
+        else tgi.stream_generate(prompt, temperature=temperature, max_new_tokens=max_tokens)
+    )
+
+    async for item in generator:
         if "token" in item:
             delta = item["token"]["text"]
             collected_text.append(delta)
@@ -95,7 +104,7 @@ async def event_stream(request: ChatStreamRequest, db: Session) -> AsyncGenerato
             "completion_tokens": num_tokens,
             "total_tokens": None,
         },
-        "backend": "tgi",
+        "backend": backend,
         "model_id": model_id,
         "temperature": temperature,
         "max_tokens": max_tokens,

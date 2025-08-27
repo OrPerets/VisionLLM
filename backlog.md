@@ -1,278 +1,241 @@
-## VisionBI AI — UI/UX Backlog (Phase 1–2)
+## VisionLLM Backlog
 
-This backlog upgrades the current PySide6 desktop app to a modern, engaging experience while keeping the existing Python architecture. It is organized into actionable tasks with acceptance criteria and file pointers.
-
-Notes
-- Primary target: Fluent 2 look and feel via `qfluentwidgets` with frameless acrylic window, message bubbles, refined theming, and micro‑interactions.
-- Alternative track: Material look via `qt-material` (optional Epic M). Do only one visual library.
-- Keep app logic as is (`llm.py`, `tools/sql_tools.py`); focus is presentation and UX.
-
-Pre-flight
-- Make a branch for the UI work.
-- Ensure Python 3.10+ and current PySide6 already installed (exists in `requirements.txt`).
-- Snapshot screenshots before starting for A/B.
-
-### Epic 0 — Foundation and Design Tokens
-
-0.1 Define design tokens (colors, spacing, typography)
-- Description: Create a minimal design token set (accent, neutrals, elevation, border radius, spacing scale, font sizes).
-- Files: `config.py` (new constants), `app.py` (`apply_theme` usage), `README.md` (document tokens).
-- Acceptance criteria:
-  - A single accent color and light/dark neutral palette are defined.
-  - Spacing uses an 8px grid (4px sub-step allowed).
-  - Font scale for titles, labels, body is documented.
-
-0.2 Update `requirements.txt`
-- Description: Add UI libraries.
-- Files: `requirements.txt`
-- Add:
-  - `qfluentwidgets>=1.4.6`
-  - `qtawesome>=1.2.4`
-  - `qframelesswindow>=1.6.3`
-- Acceptance criteria:
-  - Fresh venv installs without errors.
-
-0.3 Introduce feature flags
-- Description: Extend `config.py` with flags to toggle new UI: `UI_USE_FLUENT`, `UI_FRAMELESS`, `UI_ENABLE_ANIMATIONS`.
-- Files: `config.py`
-- Acceptance criteria:
-  - Flags exist; default to enabled for development.
-  - Flags are read in `app.py` when building the window or applying theme.
-
-### Epic 1 — Global Theming & Typography
-
-1.1 Centralize theme application
-- Description: Refactor `MainWindow.apply_theme` to read design tokens from `config.py` and compose QSS from them. Keep existing light/dark as fallback.
-- Files: `app.py` (`MainWindow.apply_theme`), `config.py` (tokens).
-- Acceptance criteria:
-  - Switching theme updates colors, typography, borders, and states consistently.
-  - No visual regressions in `Chat` and `SQL Tools` tabs.
-
-1.2 Add scalable typography utility
-- Description: Add helpers to scale font size globally from menu actions without breaking component layout.
-- Files: `app.py` (`adjust_font_global`, `ChatTab.adjust_font`, `SqlTab.adjust_font`).
-- Acceptance criteria:
-  - Global font +/- works on all major text areas and labels.
-
-### Epic 2 — Iconography and Visual Polish
-
-2.1 Integrate `qtawesome`
-- Description: Add icon pack; show icons on toolbar buttons and in the command palette.
-- Files: `app.py` (buttons in `ChatTab`, `SqlTab`, `CommandPalette`).
-- Acceptance criteria:
-  - All main buttons (Send, ETL, Transpile, Lint, Export) have meaningful icons.
-  - Command palette items show icons.
-
-2.2 Card surfaces and elevation
-- Description: Convert key panels to “card” look with soft shadows and reduced hard borders.
-- Files: `app.py` (containers around output, logs, diff dialog surfaces).
-- Acceptance criteria:
-  - Output, logs, and diff panes render with subtle elevation instead of solid borders.
-
-### Epic 3 — Frameless Window & Acrylic/Mica
-
-3.1 Replace default window frame
-- Description: Use `qframelesswindow` to create a custom, draggable title bar with window controls.
-- Files: `app.py` (`MainWindow` construction), new small `widgets/titlebar.py` (custom title bar widget).
-- Acceptance criteria:
-  - Window is draggable from title area.
-  - Minimize/maximize/close work on macOS.
-
-3.2 Acrylic/Mica background
-- Description: Enable blur/acrylic where supported (macOS: vibrancy, Windows: Mica). Provide fallback to solid.
-- Files: `app.py` (window effects), `config.py` (flag `UI_ACRYLIC`), `README.md` (note limitations).
-- Acceptance criteria:
-  - When enabled, backgrounds show blur/acrylic; when disabled, standard palette.
-
-### Epic 4 — Chat Experience (Message Bubbles)
-
-4.1 Replace monolithic `QTextEdit` with message list
-- Description: Introduce a `QListView` (or `QListWidget`) with custom `ChatMessageWidget` for User/Assistant messages, including avatars, bubble shapes, timestamp, and status.
-- Files: new `widgets/chat_message.py`; `app.py` (`ChatTab` layout: replace `RichTextOutput` with message list container while keeping `RichTextOutput` for markdown rendering inside each bubble or migrate to HTML-based label).
-- Acceptance criteria:
-  - Each message appears as a bubble with distinct left/right alignment and avatar.
-  - Long messages wrap nicely; code blocks are readable.
-
-4.2 Streaming UX
-- Description: Implement typewriter/streaming updates on the last Assistant bubble with smooth autoscroll.
-- Files: `widgets/chat_message.py` (append_stream), `app.py` (`_on_delta`, `_on_finished`).
-- Acceptance criteria:
-  - Streaming text updates do not block UI; autoscroll stays pinned to bottom unless user scrolled up.
-
-4.3 Empty states and skeletons
-- Description: Show skeleton placeholders while thinking and tasteful empty state when no conversation exists.
-- Files: `ChatTab` container and message list; small `widgets/skeleton.py`.
-- Acceptance criteria:
-  - When model is busy, a shimmering skeleton bubble is shown.
-  - On new chat, a friendly empty state illustration/text appears.
-
-### Epic 5 — Code Block UX
-
-5.1 Inline code tools
-- Description: For fenced code blocks, show an inline action bar: Copy, Insert to input, Expand.
-- Files: `widgets/chat_message.py` (DOM hooks on code blocks), `app.py` (handlers to copy/insert), reuse existing regex from context menu.
-- Acceptance criteria:
-  - Hovering a code block reveals a small toolbar; clicking Copy puts code on clipboard; Insert copies to `ChatTab.input`.
-
-5.2 Syntax highlighting polish
-- Description: Improve HTML/CSS for code blocks inside bubbles (legible background, correct font, spacing).
-- Files: `MarkdownRenderer` CSS in `app.py`.
-- Acceptance criteria:
-  - Code is easily distinguishable; horizontal scrolling when overflow occurs.
-
-### Epic 6 — Logs Drawer & Status
-
-6.1 Redesign logs into a drawer
-- Description: Convert logs panel to a bottom drawer with severity color, monospace, and copy button.
-- Files: `app.py` (`ChatTab` logs area), new buttons.
-- Acceptance criteria:
-  - Toggle animates open/close; log lines include color tags for warnings/errors.
-
-6.2 Rich meta badges
-- Description: Display small badges for model, temp, tokens/sec above the output area.
-- Files: `app.py` (`ChatTab.refresh_info`), small badge widgets.
-- Acceptance criteria:
-  - Badges are compact, readable, and update per response.
-
-### Epic 7 — DiffDialog Upgrade
-
-7.1 Color-coded diffs
-- Description: Highlight additions/deletions with background colors and gutter symbols using `difflib` or `python-diff-match-patch`.
-- Files: `app.py` (`DiffDialog`), optional helper module `utils/diff.py`.
-- Acceptance criteria:
-  - Left/right panes show green/red highlights; a legend explains colors.
-
-7.2 Apply/Copy ergonomics
-- Description: Keep current Apply/Copy, add “Copy left/right” and “Swap view”.
-- Files: `app.py` (`DiffDialog`).
-- Acceptance criteria:
-  - Additional buttons work; keyboard shortcuts for Apply (Enter) and Close (Esc).
-
-### Epic 8 — Micro‑interactions & Motion
-
-8.1 Button/hover/focus animations
-- Description: Use `QPropertyAnimation` and stateful QSS transitions (where applicable) for hover/press and focus rings.
-- Files: `app.py` (buttons in `ChatTab`, `SqlTab`).
-- Acceptance criteria:
-  - Subtle animations (150–200ms) on hover/press; focus ring animates in.
-
-8.2 Toast transitions
-- Description: Enhance `show_toast` with fade/slide and optional icon.
-- Files: `app.py` (`show_toast`).
-- Acceptance criteria:
-  - Toast fades in/out and slightly slides; no input block; disappears automatically.
-
-8.3 Progress polish
-- Description: Replace indeterminate bar with thin animated indicator under the header.
-- Files: `app.py` (`ChatTab.progress`).
-- Acceptance criteria:
-  - Indicator appears only when busy; looks modern and unobtrusive.
-
-### Epic 9 — Command Palette Enhancements
-
-9.1 Fuzzy highlight and sections
-- Description: Highlight matched text, group actions into sections (Chat, SQL, View, Export).
-- Files: `app.py` (`CommandPalette`).
-- Acceptance criteria:
-  - Filtering highlights matches; sections have headers; keyboard nav works.
-
-9.2 Action previews
-- Description: Offer small previews for some actions (e.g., “Toggle Theme” shows current state).
-- Files: `app.py` (`CommandPalette`).
-- Acceptance criteria:
-  - Preview text/icons update as you move selection.
-
-### Epic 10 — Accessibility, Responsiveness, and Settings
-
-10.1 Keyboard navigation and focus order
-- Description: Ensure tab order and shortcuts; visible focus for all interactive elements.
-- Files: `app.py` (setTabOrder, QSS focus states).
-- Acceptance criteria:
-  - Tab cycles through inputs and buttons logically in both tabs.
-
-10.2 Persist preferences
-- Description: Use `QSettings` to persist palette (light/dark), stream toggle, logs drawer, font size, and window state (already partly implemented).
-- Files: `app.py` (ensure all toggles persist), `config.py` (defaults).
-- Acceptance criteria:
-  - Relaunch restores user prefs reliably.
-
-10.3 High‑DPI and layout
-- Description: Verify scaling and spacing on Retina and different window sizes.
-- Files: QSS and layout margins.
-- Acceptance criteria:
-  - No clipped text; controls scale gracefully.
-
-### Epic 11 — Packaging & Docs
-
-11.1 Update `README.md`
-- Description: Document new dependencies, optional flags, and screenshots.
-- Files: `README.md`.
-- Acceptance criteria:
-  - Clear installation steps; before/after screenshots; feature flags table.
-
-11.2 PyInstaller configuration
-- Description: Confirm packaging includes any additional assets (icons) and third‑party styles.
-- Files/Commands: PyInstaller command in `README.md`; test build on macOS.
-- Acceptance criteria:
-  - App builds and launches; UI matches dev run.
-
-### Epic M (Optional) — Material Look via `qt-material`
-
-M.1 Evaluate Material theme
-- Description: Add `qt-material` and apply one of the modern palettes (Oceanic/Indigo), replacing custom QSS.
-- Files: `requirements.txt` (add `qt-material>=2.14`), `app.py` (theme init).
-- Acceptance criteria:
-  - Material theme renders consistently; can be toggled via feature flag; no style conflicts.
-
-M.2 Component alignment
-- Description: Reconcile spacing and control heights to Material guidelines.
-- Acceptance criteria:
-  - Buttons, inputs, and tabs match Material density; typography scale consistent.
+### Purpose and scope
+Deliver project-scoped collaboration with Google Login, an admin console to manage projects and members, shared chats per project, and per-project system instructions that steer the LLM. Include essentials for access control, auditability, and collaboration UX.
 
 ---
 
-## Implementation Order (Recommended)
-1) Epic 0 → 1 → 2 (foundation, theme, icons)
-2) Epic 3 (frameless/acrylic) — can be gated by flag
-3) Epic 4 (chat bubbles + streaming) — highest visual impact
-4) Epic 5–7 (code tools, logs, diff)
-5) Epic 8–10 (motion, palette, a11y)
-6) Epic 11 (packaging/docs)
+## Personas and roles
+- **Admin**: Can create/manage projects, assign/remove members, manage system instructions.
+- **Worker**: Member of one or more projects; can create/view project conversations and messages.
 
-## File‑level Checklist
+---
 
-- `config.py`
-  - Add: `UI_USE_FLUENT`, `UI_FRAMELESS`, `UI_ACRYLIC`, `UI_ENABLE_ANIMATIONS`, tokens (accent, neutrals, radii, spacing, font sizes).
-- `requirements.txt`
-  - Add: `qfluentwidgets`, `qtawesome`, `qframelesswindow` (and optionally `qt-material`).
-- `app.py`
-  - `MainWindow`: frameless integration, custom title bar, window effects, theme hookup.
-  - `apply_theme`: consume tokens; reduce hardcoded QSS; guard by flags.
-  - `ChatTab`: replace output area with message list; add skeletons; inline code toolbar; improved logs drawer and badges.
-  - `DiffDialog`: color diff, better controls.
-  - `CommandPalette`: icons, sections, previews.
-- New modules
-  - `widgets/titlebar.py`: custom title bar controls.
-  - `widgets/chat_message.py`: bubble widget with markdown rendering and code toolbar.
-  - `widgets/skeleton.py`: simple shimmering placeholder utilities.
-  - `utils/diff.py`: helpers for colorizing diffs.
+## Milestones
 
-## Acceptance Test Plan (Smoke)
-- Theme toggle switches palettes without glitches.
-- Frameless window draggable; controls work; acrylic on supported OS.
-- Chat shows bubbles; streaming is smooth; autoscroll behaves.
-- Code block toolbar: Copy and Insert work; Expand opens larger view.
-- Logs drawer toggles with animation; severity colors render.
-- Diff dialog shows colored additions/deletions; Apply and Copy behave.
-- Keyboard shortcuts: Send (Cmd/Ctrl+Enter), Palette (Cmd/Ctrl+K), New Chat (Cmd/Ctrl+N), Font +/-.
-- Packaging run produces consistent visuals.
+### M1 — Authentication (Google) and user model
+- [ ] Google OAuth login and logout
+- [ ] Session management (secure cookies/JWT)
+- [ ] Auto-provision users on first login
+- [ ] Basic roles: `admin`, `worker`
+- [ ] Protected routes (frontend + backend)
+- [ ] Admin bootstrap strategy (first user as admin or env-seeded)
 
-## Risks & Mitigations
-- Platform differences (macOS blur APIs): provide solid fallback; gate with `UI_ACRYLIC`.
-- Third‑party style conflicts: ensure only one style engine active (Fluent OR Material); guard by flags.
-- Performance (streaming & markdown): batch updates (already present), avoid reflowing entire view on each delta.
+### M2 — Projects and membership
+- [ ] CRUD for projects
+- [ ] Project membership management (assign/remove workers)
+- [ ] Per-project “system instructions” (Markdown or rich text)
+- [ ] RBAC: Admin-only project/membership edits
+- [ ] List projects visible to the current user
 
-## Rollback
-- Feature flags allow toggling off frameless/acrylic and Fluent. Retain the original QSS in `apply_theme` as fallback.
+### M3 — Conversations and shared chats (project scope)
+- [ ] Conversations belong to a project
+- [ ] Workers in the same project see and search all project conversations
+- [ ] Messages inherit conversation visibility
+- [ ] Update LLM calls to prepend project system instructions
+- [ ] Basic activity log entries
 
+### M4 — Collaboration features (core)
+- [ ] Presence indicators (who’s online in project)
+- [ ] Typing indicator in conversations
+- [ ] Mentions (@user) with in-app notification
+- [ ] Pinned messages per conversation
+- [ ] Shared prompt templates per project
 
+### M5 — Admin area and polish
+- [ ] Admin UI to manage projects, members, roles, and audit logs
+- [ ] Export conversation transcripts (JSON/Markdown)
+- [ ] Search across projects/conversations
+- [ ] Basic rate limiting and abuse protections
+- [ ] Docs, seed data, and end-to-end tests
+
+---
+
+## User stories and acceptance criteria
+
+### Epic: Google Login
+- As a user, I can log in via Google so I don’t need a separate password.
+  - [ ] “Login with Google” on main page
+  - [ ] Successful OAuth callback creates/updates user profile (email, name, avatar)
+  - [ ] Sessions persist across reloads; logout clears session
+  - [ ] Configurable domain allowlist (optional)
+
+- As an admin, I can be designated to access the admin console.
+  - [ ] First admin configured via seed/env or first user rule
+  - [ ] Non-admin accessing admin pages receives 403
+
+### Epic: Projects and membership
+- As an admin, I can create a project with a name and description.
+  - [ ] Create/edit/archive project
+  - [ ] Validation for unique project name per org/tenant (if applicable)
+
+- As an admin, I can add/remove workers to a project.
+  - [ ] Search users by email/name
+  - [ ] Add/remove membership instantly reflected in access
+
+- As an admin, I can set “system instructions” per project that affect LLM responses.
+  - [ ] Rich text/Markdown supported
+  - [ ] Versioned history (optional, M5)
+  - [ ] Preview LLM with current instructions (optional)
+
+- As a worker, I can see projects I belong to.
+  - [ ] Projects page lists only my projects
+  - [ ] Direct navigation via `projects/[projectId]`
+
+### Epic: Conversations and shared chats
+- As a worker, I can create a conversation within a project.
+  - [ ] New conversation requires `projectId`
+  - [ ] Title auto-generated or editable
+
+- As a worker, I can see all conversations for my project.
+  - [ ] List, filter, and search conversations by title/content/author
+  - [ ] Only members of the project can view its conversations
+
+- As a worker, my messages include the project’s system instructions when querying the LLM.
+  - [ ] Backend composes prompt = project system instructions + chat history + user message
+  - [ ] Streaming responses preserved
+
+### Epic: Collaboration features
+- Presence
+  - [ ] Online status of project members (basic last-seen if real-time not available)
+- Typing indicator
+  - [ ] Show when another member is typing in the same conversation
+- Mentions and notifications
+  - [ ] @mention a project member; in-app toast/badge shows mention; link to message
+- Pinned messages
+  - [ ] Pin/unpin per conversation; pins surfaced in a side panel
+- Shared prompt templates (per project)
+  - [ ] Create, share, and insert templates into composer
+
+### Epic: Admin area and auditability
+- Admin console
+  - [ ] Projects table, membership management, role assignment
+  - [ ] View recent activity (project created, member added, conversation created)
+- Export and governance
+  - [ ] Export conversation as JSON/Markdown
+  - [ ] Optional retention settings per project (M5+)
+- Rate limiting and abuse protection
+  - [ ] Per-user/per-project limits; friendly error messaging
+
+---
+
+## Technical plan
+
+### Backend (FastAPI)
+- Auth
+  - [ ] Add Google OAuth flow endpoints: `/auth/login/google`, `/auth/callback`, `/auth/logout`, `/auth/me`
+  - [ ] Store session as HTTP-only secure cookie or JWT; refresh strategy defined
+  - [ ] Domain allowlist via env `ALLOWED_GOOGLE_DOMAINS` (comma-separated)
+
+- Authorization
+  - [ ] Role model: `admin`, `worker`
+  - [ ] Dependency/guard for admin routes
+  - [ ] Project membership check for project and conversation routes
+
+- Projects
+  - [ ] Extend `projects` with `system_instructions TEXT`
+  - [ ] `project_members` table (user_id, project_id, role_in_project)
+  - [ ] Endpoints:
+    - `GET /projects` (mine), `POST /projects` (admin), `GET /projects/{id}`
+    - `PATCH /projects/{id}` (admin; includes system instructions)
+    - `POST /projects/{id}/members` (admin), `DELETE /projects/{id}/members/{userId}` (admin)
+
+- Conversations/Messages
+  - [ ] Ensure `conversations` has `project_id`
+  - [ ] Enforce visibility: only members can access
+  - [ ] Endpoints:
+    - `GET /projects/{id}/conversations`
+    - `POST /projects/{id}/conversations`
+    - `GET /conversations/{id}`, `DELETE /conversations/{id}` (owner/admin)
+    - `POST /conversations/{id}/messages` (stream), `GET /conversations/{id}/messages`
+
+- LLM integration
+  - [ ] Compose prompt with `project.system_instructions` in `tgi_client` (or call site)
+  - [ ] Add trace metadata: project_id, conversation_id, user_id
+
+- Collaboration primitives
+  - [ ] Presence: store ephemeral last_seen; optional WebSocket channel
+  - [ ] Typing indicator: transient events via WebSocket (or polling fallback)
+  - [ ] Mentions: parse `@` tokens, validate membership, create notification entries
+
+- Activity log
+  - [ ] `activity_logs` table: id, actor_id, action, object_type, object_id, project_id, created_at
+
+- Testing
+  - [ ] Unit and integration tests for RBAC, project scoping, and LLM prompt composition
+
+### Database (Alembic)
+- Migrations
+  - [ ] Add `system_instructions` to `projects`
+  - [ ] Create `project_members (project_id, user_id, role_in_project, created_at, unique(project_id,user_id))`
+  - [ ] Ensure `conversations.project_id` exists and is non-null
+  - [ ] `activity_logs` table
+  - [ ] `notifications` table (optional M4): id, user_id, type, data JSONB, read_at
+
+### Frontend (Next.js App Router)
+- Auth
+  - [ ] `/` is the Google login page (button + explanation)
+  - [ ] Protect routes; fetch `/auth/me`; store user in global store
+  - [ ] Logout button
+
+- Navigation
+  - [ ] `/projects` list (mine)
+  - [ ] `/projects/[projectId]` overview (members, activity, settings)
+  - [ ] `/projects/[projectId]/conversations/[conversationId]` chat UI
+  - [ ] `/admin` area for admins
+
+- Projects UI
+  - [ ] Create/edit project (admin)
+  - [ ] Manage members (admin)
+  - [ ] System instructions editor (Markdown with preview)
+
+- Conversations UI
+  - [ ] Sidebar of project conversations with search
+  - [ ] Chat window with stream, mentions, pins
+  - [ ] Presence/typing indicator
+
+- Collaboration
+  - [ ] Pinned messages panel
+  - [ ] Prompt templates panel (create/insert)
+  - [ ] In-app notifications (badge + list)
+
+- UX polish
+  - [ ] Empty states, error boundaries, optimistic updates
+  - [ ] Loading skeletons and toasts
+
+### Configuration and infra
+- [ ] Env vars:
+  - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+  - `SESSION_SECRET`, `ALLOWED_GOOGLE_DOMAINS`
+- [ ] Update `infra/env.api.example` and `infra/docker-compose.yml`
+- [ ] Seed script for admin user and a demo project
+- [ ] Rate limit middleware (per IP/user)
+
+---
+
+## Data model (proposed)
+- `users`: id, email, name, avatar_url, role, created_at, updated_at
+- `projects`: id, name, description, system_instructions, created_by, created_at, updated_at
+- `project_members`: project_id, user_id, role_in_project, created_at
+- `conversations`: id, project_id, title, created_by, created_at, updated_at
+- `messages`: id, conversation_id, role (user/assistant/system), content, created_by, created_at
+- `activity_logs`: id, actor_id, action, object_type, object_id, project_id, created_at
+- `notifications` (optional): id, user_id, type, data, read_at, created_at
+
+---
+
+## Non-functional requirements
+- **Security**: HTTP-only cookies, CSRF protection, input validation
+- **Privacy**: Project-level access only; no cross-project leakage
+- **Performance**: Stream responses; paginate lists; index FK columns
+- **Reliability**: Handle LLM timeouts/retries; graceful fallbacks for realtime features
+- **Observability**: Structured logging with project_id/conversation_id; basic metrics
+
+---
+
+## Definition of done
+- Auth, RBAC, and project scoping enforced across API and UI
+- Per-project system instructions reliably affect LLM responses
+- Workers in the same project see and collaborate on shared conversations
+- Admin console functions (projects, members, audit) available and permissioned
+- Tests passing; docs updated; seeds provided
