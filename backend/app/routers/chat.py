@@ -5,11 +5,12 @@ import json
 import time
 from typing import AsyncGenerator, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..auth import ensure_project_member, get_optional_user
 from .. import models
 from ..schemas import ChatStreamRequest
 from ..config import settings
@@ -34,13 +35,14 @@ def build_prompt(system_prompt: str | None, history: List[models.Message], user_
     return "\n".join(parts)
 
 
-async def event_stream(request: ChatStreamRequest, db: Session) -> AsyncGenerator[str, None]:
+async def event_stream(request: ChatStreamRequest, http_request: Request, db: Session) -> AsyncGenerator[str, None]:
     project = db.query(models.Project).get(request.project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     conversation = db.query(models.Conversation).get(request.conversation_id)
     if not conversation or conversation.project_id != project.id:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    ensure_project_member(project.id, http_request, db)
 
     # Collect history by simple recency window (bounded by N messages)
     history = (
@@ -96,6 +98,8 @@ async def event_stream(request: ChatStreamRequest, db: Session) -> AsyncGenerato
     assistant_text = "".join(collected_text)
 
     # Persist assistant message with meta
+    # Attach trace metadata
+    current_user = get_optional_user(http_request, db)
     meta = {
         "elapsed_sec": elapsed,
         "tokens_per_sec": tokens_per_sec,
@@ -108,6 +112,9 @@ async def event_stream(request: ChatStreamRequest, db: Session) -> AsyncGenerato
         "model_id": model_id,
         "temperature": temperature,
         "max_tokens": max_tokens,
+        "project_id": project.id,
+        "conversation_id": conversation.id,
+        "user_id": (current_user.id if current_user else None),
     }
 
     assistant_msg = models.Message(
@@ -117,7 +124,8 @@ async def event_stream(request: ChatStreamRequest, db: Session) -> AsyncGenerato
         meta_json=meta,
     )
     db.add(assistant_msg)
-    conversation.updated_at = assistant_msg.created_at
+    # Ensure updated_at is not None
+    conversation.updated_at = assistant_msg.created_at or conversation.updated_at
     db.commit()
     db.refresh(assistant_msg)
 
@@ -129,9 +137,9 @@ async def event_stream(request: ChatStreamRequest, db: Session) -> AsyncGenerato
 
 
 @router.post("/stream")
-def stream_chat(request: ChatStreamRequest, db=Depends(get_db)):
+def stream_chat(request: ChatStreamRequest, http_request: Request, db=Depends(get_db)):
     async def generator():
-        async for chunk in event_stream(request, db):
+        async for chunk in event_stream(request, http_request, db):
             yield chunk
 
     return StreamingResponse(generator(), media_type="text/event-stream")

@@ -13,6 +13,7 @@ export async function streamChat(
       headers: {
         "Content-Type": "application/json",
       },
+      credentials: "include",
       body: JSON.stringify({
         ...request,
         stream: true,

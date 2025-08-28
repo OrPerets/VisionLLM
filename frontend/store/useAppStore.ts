@@ -7,6 +7,7 @@ import {
   AppState,
   StreamDelta,
   StreamingMeta,
+  UserRead,
 } from "@/lib/types";
 import {
   getProjects,
@@ -16,15 +17,26 @@ import {
   getConversations,
   createConversation,
   deleteConversation,
+  updateConversation,
   getMessages,
+  getCurrentUser,
+  login,
+  logout,
+  refreshAuth,
 } from "@/lib/api";
 import {
   CreateProjectRequest,
   UpdateProjectRequest,
   CreateConversationRequest,
+  UpdateConversationRequest,
 } from "@/lib/types";
 
 interface AppStore extends AppState {
+  // Auth state
+  user: UserRead | null;
+  isAuthChecked: boolean;
+  isAuthenticating: boolean;
+
   // Actions
   loadProjects: () => Promise<void>;
   selectProject: (projectId: number) => void;
@@ -32,10 +44,11 @@ interface AppStore extends AppState {
   updateProjectData: (projectId: number, data: UpdateProjectRequest) => Promise<void>;
   deleteProjectData: (projectId: number) => Promise<void>;
   
-  loadConversations: (projectId: number) => Promise<void>;
+  loadConversations: (projectId: number, q?: string) => Promise<void>;
   selectConversation: (conversationId: number) => void;
   createNewConversation: (projectId: number, data?: CreateConversationRequest) => Promise<ConversationRead>;
   deleteConversationData: (conversationId: number) => Promise<void>;
+  renameConversation: (conversationId: number, data: UpdateConversationRequest) => Promise<ConversationRead>;
   
   loadMessages: (conversationId: number) => Promise<void>;
   addUserMessage: (conversationId: number, content: string) => MessageRead;
@@ -45,14 +58,21 @@ interface AppStore extends AppState {
   
   setLeftSidebarOpen: (open: boolean) => void;
   setRightSidebarOpen: (open: boolean) => void;
+  setRightSidebarWidth: (width: number) => void;
   setTheme: (theme: "light" | "dark" | "system") => void;
   setLoading: (loading: boolean) => void;
+
+  // Auth actions
+  checkAuth: () => Promise<void>;
+  loginUser: (email: string, password: string) => Promise<UserRead>;
+  logoutUser: () => Promise<void>;
   
   // Computed getters
   getCurrentProject: () => ProjectRead | null;
   getCurrentConversation: () => ConversationRead | null;
   getCurrentMessages: () => MessageRead[];
   getProjectConversations: (projectId: number) => ConversationRead[];
+  isAuthenticated: () => boolean;
 }
 
 let messageIdCounter = 1000000; // Start high to avoid conflicts with backend IDs
@@ -69,7 +89,13 @@ export const useAppStore = create<AppStore>()(
       isLoading: false,
       leftSidebarOpen: true,
       rightSidebarOpen: true,
+      rightSidebarWidth: 320, // Default 320px (w-80)
       theme: "system",
+
+      // Auth state
+      user: null,
+      isAuthChecked: false,
+      isAuthenticating: false,
 
       // Project actions
       loadProjects: async () => {
@@ -124,9 +150,9 @@ export const useAppStore = create<AppStore>()(
       },
 
       // Conversation actions
-      loadConversations: async (projectId) => {
+      loadConversations: async (projectId, q) => {
         try {
-          const conversations = await getConversations(projectId);
+          const conversations = await getConversations(projectId, q);
           set((state) => ({
             conversationsByProject: {
               ...state.conversationsByProject,
@@ -180,6 +206,22 @@ export const useAppStore = create<AppStore>()(
             selectedConversationId: state.selectedConversationId === conversationId ? null : state.selectedConversationId,
           };
         });
+      },
+
+      renameConversation: async (conversationId, data) => {
+        const updated = await updateConversation(conversationId, data);
+        set((state) => {
+          const newConversationsByProject = { ...state.conversationsByProject };
+          // Update in all project lists where it exists
+          for (const key in newConversationsByProject) {
+            const pid = parseInt(key);
+            newConversationsByProject[pid] = (newConversationsByProject[pid] || []).map((c) =>
+              c.id === conversationId ? updated : c
+            );
+          }
+          return { conversationsByProject: newConversationsByProject };
+        });
+        return updated;
       },
 
       // Message actions
@@ -299,8 +341,51 @@ export const useAppStore = create<AppStore>()(
       // UI actions
       setLeftSidebarOpen: (open) => set({ leftSidebarOpen: open }),
       setRightSidebarOpen: (open) => set({ rightSidebarOpen: open }),
+      setRightSidebarWidth: (width) => set({ rightSidebarWidth: Math.max(240, Math.min(800, width)) }), // Constrain between 240px and 800px
       setTheme: (theme) => set({ theme }),
       setLoading: (loading) => set({ isLoading: loading }),
+
+      // Auth actions
+      checkAuth: async () => {
+        if (get().isAuthChecked) return;
+        
+        try {
+          const { user } = await getCurrentUser();
+          set({ user, isAuthChecked: true });
+        } catch (error) {
+          set({ user: null, isAuthChecked: true });
+        }
+      },
+
+      loginUser: async (email: string, password: string) => {
+        set({ isAuthenticating: true });
+        try {
+          const { user } = await login(email, password);
+          set({ user, isAuthenticating: false, isAuthChecked: true });
+          return user;
+        } catch (error) {
+          set({ isAuthenticating: false });
+          throw error;
+        }
+      },
+
+      logoutUser: async () => {
+        try {
+          await logout();
+        } catch (error) {
+          // Continue with logout even if API call fails
+          console.error("Logout API call failed:", error);
+        } finally {
+          set({ 
+            user: null, 
+            projects: [], 
+            conversationsByProject: {}, 
+            messagesByConversation: {},
+            selectedProjectId: null,
+            selectedConversationId: null 
+          });
+        }
+      },
 
       // Computed getters
       getCurrentProject: () => {
@@ -327,13 +412,20 @@ export const useAppStore = create<AppStore>()(
         const { conversationsByProject } = get();
         return conversationsByProject[projectId] || [];
       },
+
+      isAuthenticated: () => {
+        const { user, isAuthChecked } = get();
+        return isAuthChecked && user !== null;
+      },
     }),
     {
       name: "visionbi-app-storage",
       partialize: (state) => ({
         leftSidebarOpen: state.leftSidebarOpen,
         rightSidebarOpen: state.rightSidebarOpen,
+        rightSidebarWidth: state.rightSidebarWidth,
         theme: state.theme,
+        // Note: We don't persist auth state for security
       }),
     }
   )

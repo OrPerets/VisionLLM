@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy.orm import Session
 from ..config import settings
+from ..db import get_db
+from .. import models
+from ..auth import require_admin
 
 
 router = APIRouter()
@@ -36,5 +40,27 @@ async def meta() -> dict[str, str | bool]:
         "model_server_ok": ok,
         "model_id": model_id,
     }
+
+
+@router.get("/admin/activity", dependencies=[Depends(require_admin)])
+def recent_activity(limit: int = 50, db: Session = Depends(get_db)) -> list[dict[str, str | int | None]]:
+    rows = (
+        db.query(models.ActivityLog)
+        .order_by(models.ActivityLog.created_at.desc())
+        .limit(min(limit, 200))
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "actor_id": r.actor_id,
+            "action": r.action,
+            "object_type": r.object_type,
+            "object_id": r.object_id,
+            "project_id": r.project_id,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]
 
 

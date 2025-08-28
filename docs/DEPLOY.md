@@ -11,16 +11,34 @@
   - `MAX_INPUT_TOKENS`, `MAX_TOTAL_TOKENS`
   - `DATABASE_URL`, `CORS_ORIGIN`, `TEMPERATURE`, `MAX_TOKENS`
 
-### Deploy steps
+### Deploy steps (production)
 ```bash
 git clone <this repo>
 cd VisionLLM
-docker compose -f infra/docker-compose.yml up -d --build
+
+# 1) Prepare env files
+# Backend API env consumed by compose (`env_file` in api service)
+cp infra/env.api.example backend/.env.api
+# TGI env (model id, tokens)
+cp infra/env.tgi.example infra/env.tgi
+
+# 2) Edit values:
+# - backend/.env.api → CORS_ORIGIN (your web URL), SESSION_SECRET, ENABLE_AUTH, etc.
+# - infra/env.tgi → MODEL_ID you want to serve, optional HF token
+
+# 3) Bring up stack with production override (keeps db/tgi internal, sets API base for web)
+export NEXT_PUBLIC_API_BASE="http://<api-host>:8000/api"
+export CORS_ORIGIN="http://<web-host>:3000"
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml \
+  up -d --build
+
+# 4) Apply DB migrations (one-time per upgrade)
+docker compose -f infra/docker-compose.yml exec api make migrate | cat
 ```
 
 Access:
-- Web: http://<host>:3000
-- API: http://<host>:8000
+- Web: http://<web-host>:3000
+- API: http://<api-host>:8000
 
 ### Model cache reuse
 TGI uses `hf_cache` volume (`/data/.cache/huggingface`) so model downloads occur once. To pre-seed offline:
@@ -29,10 +47,11 @@ TGI uses `hf_cache` volume (`/data/.cache/huggingface`) so model downloads occur
 3) Mount the volume at the same path on the TGI container.
 
 ### Security notes
-- Restrict service exposure to your internal network (firewall/security groups).
-- Set `AUTH_TOKEN` on the API and require it via a simple bearer check (stub in place).
-- Configure CORS to your internal web origin.
-- For SSO/OIDC, integrate in front of the API (reverse proxy) or extend the API auth layer.
+- Keep `db` and `tgi` internal-only (prod override does this by default).
+- Restrict `web` and `api` to your internal network (firewall/security groups).
+- Configure `CORS_ORIGIN` to your internal web origin.
+- Front the `web` and `api` services with a reverse proxy or load balancer for TLS.
+- For SSO/OIDC, integrate at the proxy or extend the API auth layer.
 
 ### Upgrades
 - Pull new images or rebuild `api`/`web`.

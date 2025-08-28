@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { StatusIndicator } from "@/components/common/status-indicator";
 import { useAppStore } from "@/store/useAppStore";
 import { useUIStore } from "@/lib/ui";
-import { getMeta, getHealth } from "@/lib/api";
+import { getMeta, getHealth, API_BASE } from "@/lib/api";
 import { Meta, Health } from "@/lib/types";
 import {
   Menu,
@@ -14,6 +15,8 @@ import {
   Settings,
   GitBranch,
   RefreshCw,
+  LogOut,
+  Brain,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -63,76 +66,188 @@ export function AppHeader() {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border px-4">
-      <div className="flex items-center gap-4">
+    <motion.header 
+      className="flex h-16 items-center justify-between border-b border-border/50 px-6 bg-background/80 backdrop-blur-sm"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="flex items-center gap-6">
         {/* Left Sidebar Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-          className="h-8 w-8"
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
-          {leftSidebarOpen ? (
-            <X className="h-4 w-4" />
-          ) : (
-            <Menu className="h-4 w-4" />
-          )}
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
+            className="h-9 w-9 hover:bg-muted/50"
+          >
+            <AnimatePresence mode="wait">
+              {leftSidebarOpen ? (
+                <motion.div
+                  key="close"
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <X className="h-4 w-4" />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="menu"
+                  initial={{ rotate: 90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: -90, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Menu className="h-4 w-4" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Button>
+        </motion.div>
 
         {/* Brand */}
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">VisionBI Assistant</h1>
-        </div>
+        <motion.div 
+          className="flex items-center gap-3"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="relative">
+            <motion.div
+              className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
+              whileHover={{ scale: 1.05, rotate: 5 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+            >
+              <Brain className="h-4 w-4 text-white" />
+            </motion.div>
+          </div>
+          <div>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+              VisionBI Assistant
+            </h1>
+          </div>
+        </motion.div>
 
         {/* Status */}
-        <div className="flex items-center gap-2">
+        <motion.div 
+          className="flex items-center gap-3 pl-4 border-l border-border/50"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+        >
           <StatusIndicator
             status={getServerStatus()}
             tooltip={getStatusTooltip()}
           />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={fetchStatus}
-            disabled={isLoading}
-            className="h-6 w-6"
+          <motion.div
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
           >
-            <RefreshCw className={`h-3 w-3 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={fetchStatus}
+              disabled={isLoading}
+              className="h-7 w-7 hover:bg-muted/50"
+            >
+              <motion.div
+                animate={{ rotate: isLoading ? 360 : 0 }}
+                transition={{ 
+                  duration: isLoading ? 1 : 0, 
+                  repeat: isLoading ? Infinity : 0,
+                  ease: "linear"
+                }}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </motion.div>
+            </Button>
+          </motion.div>
+        </motion.div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <motion.div 
+        className="flex items-center gap-3"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.15 }}
+      >
         {/* Search/Command Palette */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCommandPaletteOpen(true)}
-          className="flex items-center gap-2"
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
         >
-          <Search className="h-4 w-4" />
-          <span className="hidden sm:inline">Search</span>
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-            <span className="text-xs">⌘</span>K
-          </kbd>
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCommandPaletteOpen(true)}
+            className="flex items-center gap-3 h-9 px-4 bg-background/50 border-border/50 hover:bg-background/80 hover:border-border"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden sm:inline text-sm">Search</span>
+            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-80 sm:flex">
+              <span className="text-xs">⌘</span>K
+            </kbd>
+          </Button>
+        </motion.div>
 
         {/* Git Info */}
-        <div className="hidden md:flex items-center gap-1 text-sm text-muted-foreground">
-          <GitBranch className="h-3 w-3" />
-          <span>main</span>
-        </div>
+        <motion.div 
+          className="hidden md:flex items-center gap-2 text-sm text-muted-foreground px-3 py-1.5 rounded-md bg-muted/30"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.25 }}
+        >
+          <GitBranch className="h-3.5 w-3.5" />
+          <span className="font-mono text-xs">main</span>
+        </motion.div>
+
+        <div className="h-6 w-px bg-border/50" />
 
         {/* Right Sidebar Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-          className="h-8 w-8"
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
-          <Settings className="h-4 w-4" />
-        </Button>
-      </div>
-    </header>
+          <Button
+            variant={rightSidebarOpen ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+            className="h-9 w-9 hover:bg-muted/50"
+          >
+            <motion.div
+              animate={{ rotate: rightSidebarOpen ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Settings className="h-4 w-4" />
+            </motion.div>
+          </Button>
+        </motion.div>
+
+        {/* Logout */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              fetch(`${API_BASE}/auth/logout`, { credentials: "include" }).finally(() => {
+                window.location.href = "/";
+              });
+            }}
+            className="h-9 px-4 bg-background/50 border-border/50 hover:bg-background/80 hover:border-border text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Logout</span>
+          </Button>
+        </motion.div>
+      </motion.div>
+    </motion.header>
   );
 }

@@ -19,6 +19,9 @@ class Meta(BaseModel):
 class UserRead(BaseModel):
     id: int
     email: Optional[str]
+    name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    role: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -48,7 +51,30 @@ class ProjectRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProjectMemberCreate(BaseModel):
+    email: str
+    role_in_project: Optional[str] = Field(default="worker")
+
+
+class ProjectMemberRead(BaseModel):
+    id: int
+    project_id: int
+    user_id: int
+    role_in_project: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectMemberUpdate(BaseModel):
+    role_in_project: str
+
+
 class ConversationCreate(BaseModel):
+    title: Optional[str] = None
+
+
+class ConversationUpdate(BaseModel):
     title: Optional[str] = None
 
 
@@ -103,4 +129,24 @@ class SQLLintResponse(BaseModel):
     report: str
     fixed: str
 
+
+class ActivityLogRead(BaseModel):
+    id: int
+    actor_id: Optional[int]
+    action: str
+    object_type: str
+    object_id: int
+    project_id: Optional[int]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserRoleUpdate(BaseModel):
+    role: str
+
+
+class SearchResponse(BaseModel):
+    projects: list["ProjectRead"]
+    conversations: list["ConversationRead"]
 

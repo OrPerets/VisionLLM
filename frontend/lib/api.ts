@@ -7,11 +7,18 @@ import {
   CreateProjectRequest,
   UpdateProjectRequest,
   CreateConversationRequest,
+  UpdateConversationRequest,
   SQLTranspileRequest,
   SQLLintRequest,
   SQLTranspileResponse,
   SQLLintResponse,
   APIError,
+  ActivityLog,
+  SearchResponse,
+  UserRead,
+  ProjectMemberRead,
+  ProjectMemberCreateRequest,
+  ProjectMemberUpdateRequest,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api";
@@ -23,6 +30,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...init?.headers,
     },
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -74,9 +82,36 @@ export async function deleteProject(projectId: number): Promise<{ ok: true }> {
   });
 }
 
+// Project members
+export async function getProjectMembers(projectId: number): Promise<ProjectMemberRead[]> {
+  return fetchJson<ProjectMemberRead[]>(`${API_BASE}/projects/${projectId}/members`);
+}
+
+export async function addProjectMember(projectId: number, data: ProjectMemberCreateRequest): Promise<ProjectMemberRead> {
+  return fetchJson<ProjectMemberRead>(`${API_BASE}/projects/${projectId}/members`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateProjectMember(projectId: number, userId: number, data: ProjectMemberUpdateRequest): Promise<ProjectMemberRead> {
+  return fetchJson<ProjectMemberRead>(`${API_BASE}/projects/${projectId}/members/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function removeProjectMember(projectId: number, userId: number): Promise<{ ok: true }> {
+  return fetchJson<{ ok: true }>(`${API_BASE}/projects/${projectId}/members/${userId}`, {
+    method: "DELETE",
+  });
+}
+
 // Conversation endpoints
-export async function getConversations(projectId: number): Promise<ConversationRead[]> {
-  return fetchJson<ConversationRead[]>(`${API_BASE}/projects/${projectId}/conversations`);
+export async function getConversations(projectId: number, q?: string): Promise<ConversationRead[]> {
+  const url = new URL(`${API_BASE}/projects/${projectId}/conversations`);
+  if (q && q.trim()) url.searchParams.set("q", q);
+  return fetchJson<ConversationRead[]>(url.toString());
 }
 
 export async function createConversation(
@@ -90,12 +125,22 @@ export async function createConversation(
 }
 
 export async function getConversation(conversationId: number): Promise<ConversationRead> {
-  return fetchJson<ConversationRead>(`${API_BASE}/conversations/${conversationId}`);
+  return fetchJson<ConversationRead>(`${API_BASE}/projects/conversations/${conversationId}`);
 }
 
 export async function deleteConversation(conversationId: number): Promise<{ ok: true }> {
-  return fetchJson<{ ok: true }>(`${API_BASE}/conversations/${conversationId}`, {
+  return fetchJson<{ ok: true }>(`${API_BASE}/projects/conversations/${conversationId}`, {
     method: "DELETE",
+  });
+}
+
+export async function updateConversation(
+  conversationId: number,
+  data: UpdateConversationRequest
+): Promise<ConversationRead> {
+  return fetchJson<ConversationRead>(`${API_BASE}/projects/conversations/${conversationId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
   });
 }
 
@@ -116,6 +161,20 @@ export async function getMessages(
   return fetchJson<MessageRead[]>(url);
 }
 
+// Exports
+export async function exportConversationJSON(conversationId: number): Promise<any> {
+  return fetchJson<any>(`${API_BASE}/projects/conversations/${conversationId}/export.json`);
+}
+
+export async function exportConversationMarkdown(conversationId: number): Promise<string> {
+  const response = await fetch(`${API_BASE}/projects/conversations/${conversationId}/export.md`, {
+    method: "GET",
+    credentials: "include",
+  });
+  if (!response.ok) throw new APIError(response.status, response.statusText, "Export failed");
+  return await response.text();
+}
+
 // SQL tools endpoints
 export async function sqlTranspile(data: SQLTranspileRequest): Promise<SQLTranspileResponse> {
   return fetchJson<SQLTranspileResponse>(`${API_BASE}/sql/transpile`, {
@@ -133,3 +192,65 @@ export async function sqlLint(data: SQLLintRequest): Promise<SQLLintResponse> {
 
 // Export API base for use in streaming
 export { API_BASE };
+
+// Admin endpoints
+export async function getRecentActivity(limit = 50): Promise<ActivityLog[]> {
+  return fetchJson<ActivityLog[]>(`${API_BASE}/admin/activity?limit=${limit}`);
+}
+
+export async function searchAll(q: string): Promise<SearchResponse> {
+  const url = new URL(`${API_BASE}/projects/search`);
+  url.searchParams.set("q", q);
+  return fetchJson<SearchResponse>(url.toString());
+}
+
+export async function listUsers(q?: string): Promise<UserRead[]> {
+  const url = new URL(`${API_BASE}/admin/users`);
+  if (q) url.searchParams.set("q", q);
+  return fetchJson<UserRead[]>(url.toString());
+}
+
+export async function updateUserRole(userId: number, role: string): Promise<UserRead> {
+  return fetchJson<UserRead>(`${API_BASE}/admin/users/${userId}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function adminCleanupDB(scope: "chat" | "all" | "demo"): Promise<{ ok: true; counts?: Record<string, number> }> {
+  return fetchJson<{ ok: true; counts?: Record<string, number> }>(`${API_BASE}/admin/maintenance/cleanup`, {
+    method: "POST",
+    body: JSON.stringify({ scope }),
+  });
+}
+
+// Auth endpoints
+export async function getCurrentUser(): Promise<{ user: UserRead | null }> {
+  return fetchJson<{ user: UserRead | null }>(`${API_BASE}/auth/me`);
+}
+
+export async function login(email: string, password: string): Promise<{ user: UserRead; token?: string }> {
+  return fetchJson<{ user: UserRead; token?: string }>(`${API_BASE}/auth/login`, {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function logout(): Promise<{ ok: true }> {
+  return fetchJson<{ ok: true }>(`${API_BASE}/auth/logout`, {
+    method: "POST",
+  });
+}
+
+export async function refreshAuth(): Promise<{ user: UserRead | null }> {
+  try {
+    return await getCurrentUser();
+  } catch (error) {
+    return { user: null };
+  }
+}
+
+// Google OAuth redirect (for existing flow)
+export function redirectToGoogleLogin(): void {
+  window.location.href = `${API_BASE}/auth/login/google`;
+}

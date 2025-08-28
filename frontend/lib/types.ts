@@ -26,6 +26,23 @@ export interface MessageRead {
   created_at: string;
 }
 
+export interface UserRead {
+  id: number;
+  email?: string | null;
+  name?: string | null;
+  avatar_url?: string | null;
+  role?: string | null;
+  created_at: string;
+}
+
+export interface ProjectMemberRead {
+  id: number;
+  project_id: number;
+  user_id: number;
+  role_in_project: string;
+  created_at: string;
+}
+
 export interface Meta {
   backend_version: string;
   model_server_ok: boolean;
@@ -34,6 +51,21 @@ export interface Meta {
 
 export interface Health {
   ok: boolean;
+}
+
+export interface ActivityLog {
+  id: number;
+  actor_id?: number | null;
+  action: string;
+  object_type: string;
+  object_id: number;
+  project_id?: number | null;
+  created_at: string;
+}
+
+export interface SearchResponse {
+  projects: ProjectRead[];
+  conversations: ConversationRead[];
 }
 
 export interface StreamingMeta {
@@ -64,6 +96,10 @@ export interface UpdateProjectRequest {
 }
 
 export interface CreateConversationRequest {
+  title?: string;
+}
+
+export interface UpdateConversationRequest {
   title?: string;
 }
 
@@ -108,6 +144,7 @@ export interface AppState {
   isLoading: boolean;
   leftSidebarOpen: boolean;
   rightSidebarOpen: boolean;
+  rightSidebarWidth: number;
   theme: "light" | "dark" | "system";
 }
 
@@ -154,3 +191,13 @@ export const SQL_DIALECTS = [
 ] as const;
 
 export type SQLDialect = typeof SQL_DIALECTS[number];
+
+// Admin/member requests
+export interface ProjectMemberCreateRequest {
+  email: string;
+  role_in_project?: string;
+}
+
+export interface ProjectMemberUpdateRequest {
+  role_in_project: string;
+}

@@ -20,6 +20,9 @@ def upgrade() -> None:
         'users',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('email', sa.String(length=255), nullable=True),
+        sa.Column('name', sa.String(length=255), nullable=True),
+        sa.Column('avatar_url', sa.String(length=1024), nullable=True),
+        sa.Column('role', sa.String(length=20), nullable=False, server_default='worker'),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint('id')
     )
@@ -63,10 +66,45 @@ def upgrade() -> None:
     )
     op.create_index('idx_messages_conversation_id_created_at', 'messages', ['conversation_id', 'created_at'], unique=False)
 
+    op.create_table(
+        'project_members',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('project_id', sa.Integer(), nullable=False),
+        sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('role_in_project', sa.String(length=20), nullable=False, server_default='worker'),
+        sa.Column('created_at', sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('project_id', 'user_id', name='uq_project_members_project_user'),
+    )
+    op.create_index('idx_project_members_project_id', 'project_members', ['project_id'], unique=False)
+    op.create_index('idx_project_members_user_id', 'project_members', ['user_id'], unique=False)
+
+    op.create_table(
+        'activity_logs',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('actor_id', sa.Integer(), nullable=True),
+        sa.Column('action', sa.String(length=50), nullable=False),
+        sa.Column('object_type', sa.String(length=50), nullable=False),
+        sa.Column('object_id', sa.Integer(), nullable=False),
+        sa.Column('project_id', sa.Integer(), nullable=True),
+        sa.Column('created_at', sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(['actor_id'], ['users.id'], ),
+        sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_activity_logs_project_id'), 'activity_logs', ['project_id'], unique=False)
+
 
 def downgrade() -> None:
     op.drop_index('idx_messages_conversation_id_created_at', table_name='messages')
     op.drop_table('messages')
+    op.drop_index(op.f('ix_activity_logs_project_id'), table_name='activity_logs')
+    op.drop_table('activity_logs')
+    op.drop_index('idx_project_members_user_id', table_name='project_members')
+    op.drop_index('idx_project_members_project_id', table_name='project_members')
+    op.drop_table('project_members')
     op.drop_index('idx_conversations_project_id', table_name='conversations')
     op.drop_table('conversations')
     op.drop_table('projects')

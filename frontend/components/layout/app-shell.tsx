@@ -13,7 +13,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { leftSidebarOpen, rightSidebarOpen } = useAppStore();
+  const { leftSidebarOpen, rightSidebarOpen, rightSidebarWidth } = useAppStore();
   const { isMobile } = useUIStore();
   const { handleKeydown } = useKeyboardShortcuts();
 
@@ -48,9 +48,13 @@ export function AppShell({ children }: AppShellProps) {
           <div
             className={cn(
               "flex-shrink-0 border-l border-border transition-all duration-300",
-              rightSidebarOpen ? "w-80" : "w-0",
-              isMobile && rightSidebarOpen && "fixed inset-y-0 right-0 z-50 w-80"
+              rightSidebarOpen ? "" : "w-0",
+              isMobile && rightSidebarOpen && "fixed inset-y-0 right-0 z-50"
             )}
+            style={{
+              width: rightSidebarOpen ? `${rightSidebarWidth}px` : '0px',
+              ...(isMobile && rightSidebarOpen && { width: `${rightSidebarWidth}px` })
+            }}
           >
             {rightSidebarOpen && <RightSidebar />}
           </div>

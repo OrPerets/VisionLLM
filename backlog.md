@@ -14,26 +14,26 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 ## Milestones
 
 ### M1 — Authentication (Google) and user model
-- [ ] Google OAuth login and logout
-- [ ] Session management (secure cookies/JWT)
-- [ ] Auto-provision users on first login
-- [ ] Basic roles: `admin`, `worker`
-- [ ] Protected routes (frontend + backend)
-- [ ] Admin bootstrap strategy (first user as admin or env-seeded)
+- [x] Google OAuth login and logout
+- [x] Session management (secure cookies/JWT)
+- [x] Auto-provision users on first login
+- [x] Basic roles: `admin`, `worker`
+- [x] Protected routes (frontend + backend)
+- [x] Admin bootstrap strategy (first user as admin or env-seeded)
 
 ### M2 — Projects and membership
-- [ ] CRUD for projects
-- [ ] Project membership management (assign/remove workers)
-- [ ] Per-project “system instructions” (Markdown or rich text)
-- [ ] RBAC: Admin-only project/membership edits
-- [ ] List projects visible to the current user
+- [x] CRUD for projects
+- [x] Project membership management (assign/remove workers)
+- [x] Per-project “system instructions” (Markdown or rich text)
+- [x] RBAC: Admin-only project/membership edits
+- [x] List projects visible to the current user
 
 ### M3 — Conversations and shared chats (project scope)
-- [ ] Conversations belong to a project
-- [ ] Workers in the same project see and search all project conversations
-- [ ] Messages inherit conversation visibility
-- [ ] Update LLM calls to prepend project system instructions
-- [ ] Basic activity log entries
+- [x] Conversations belong to a project
+- [x] Workers in the same project see and search all project conversations
+- [x] Messages inherit conversation visibility
+- [x] Update LLM calls to prepend project system instructions
+- [x] Basic activity log entries
 
 ### M4 — Collaboration features (core)
 - [ ] Presence indicators (who’s online in project)
@@ -43,10 +43,10 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 - [ ] Shared prompt templates per project
 
 ### M5 — Admin area and polish
-- [ ] Admin UI to manage projects, members, roles, and audit logs
-- [ ] Export conversation transcripts (JSON/Markdown)
-- [ ] Search across projects/conversations
-- [ ] Basic rate limiting and abuse protections
+- [x] Admin UI to manage projects, members, roles, and audit logs
+- [x] Export conversation transcripts (JSON/Markdown)
+- [x] Search across projects/conversations
+- [x] Basic rate limiting and abuse protections
 - [ ] Docs, seed data, and end-to-end tests
 
 ---
@@ -55,23 +55,23 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 
 ### Epic: Google Login
 - As a user, I can log in via Google so I don’t need a separate password.
-  - [ ] “Login with Google” on main page
-  - [ ] Successful OAuth callback creates/updates user profile (email, name, avatar)
-  - [ ] Sessions persist across reloads; logout clears session
-  - [ ] Configurable domain allowlist (optional)
+  - [x] “Login with Google” on main page
+  - [x] Successful OAuth callback creates/updates user profile (email, name, avatar)
+  - [x] Sessions persist across reloads; logout clears session
+  - [x] Configurable domain allowlist (optional)
 
 - As an admin, I can be designated to access the admin console.
-  - [ ] First admin configured via seed/env or first user rule
-  - [ ] Non-admin accessing admin pages receives 403
+  - [x] First admin configured via seed/env or first user rule
+  - [x] Non-admin accessing admin pages receives 403
 
 ### Epic: Projects and membership
 - As an admin, I can create a project with a name and description.
-  - [ ] Create/edit/archive project
-  - [ ] Validation for unique project name per org/tenant (if applicable)
+  - [x] Create/edit/archive project
+  - [x] Validation for unique project name per org/tenant (if applicable)
 
 - As an admin, I can add/remove workers to a project.
   - [ ] Search users by email/name
-  - [ ] Add/remove membership instantly reflected in access
+  - [x] Add/remove membership instantly reflected in access
 
 - As an admin, I can set “system instructions” per project that affect LLM responses.
   - [ ] Rich text/Markdown supported
@@ -79,21 +79,21 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
   - [ ] Preview LLM with current instructions (optional)
 
 - As a worker, I can see projects I belong to.
-  - [ ] Projects page lists only my projects
-  - [ ] Direct navigation via `projects/[projectId]`
+  - [x] Projects page lists only my projects
+  - [x] Direct navigation via `projects/[projectId]`
 
 ### Epic: Conversations and shared chats
 - As a worker, I can create a conversation within a project.
-  - [ ] New conversation requires `projectId`
-  - [ ] Title auto-generated or editable
+  - [x] New conversation requires `projectId`
+  - [x] Title auto-generated or editable
 
 - As a worker, I can see all conversations for my project.
-  - [ ] List, filter, and search conversations by title/content/author
-  - [ ] Only members of the project can view its conversations
+  - [x] List and search conversations by title/content (author filter pending)
+  - [x] Only members of the project can view its conversations
 
 - As a worker, my messages include the project’s system instructions when querying the LLM.
-  - [ ] Backend composes prompt = project system instructions + chat history + user message
-  - [ ] Streaming responses preserved
+  - [x] Backend composes prompt = project system instructions + chat history + user message
+  - [x] Streaming responses preserved
 
 ### Epic: Collaboration features
 - Presence
@@ -109,13 +109,13 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 
 ### Epic: Admin area and auditability
 - Admin console
-  - [ ] Projects table, membership management, role assignment
-  - [ ] View recent activity (project created, member added, conversation created)
+  - [x] Projects table, membership management, role assignment
+  - [x] View recent activity (project created, member added, conversation created)
 - Export and governance
-  - [ ] Export conversation as JSON/Markdown
+  - [x] Export conversation as JSON/Markdown
   - [ ] Optional retention settings per project (M5+)
 - Rate limiting and abuse protection
-  - [ ] Per-user/per-project limits; friendly error messaging
+  - [x] Per-user/per-project limits; friendly error messaging
 
 ---
 
@@ -123,35 +123,35 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 
 ### Backend (FastAPI)
 - Auth
-  - [ ] Add Google OAuth flow endpoints: `/auth/login/google`, `/auth/callback`, `/auth/logout`, `/auth/me`
-  - [ ] Store session as HTTP-only secure cookie or JWT; refresh strategy defined
-  - [ ] Domain allowlist via env `ALLOWED_GOOGLE_DOMAINS` (comma-separated)
+  - [x] Add Google OAuth flow endpoints: `/auth/login/google`, `/auth/callback`, `/auth/logout`, `/auth/me`
+  - [x] Store session as HTTP-only secure cookie or JWT; refresh strategy defined
+  - [x] Domain allowlist via env `ALLOWED_GOOGLE_DOMAINS` (comma-separated)
 
 - Authorization
-  - [ ] Role model: `admin`, `worker`
-  - [ ] Dependency/guard for admin routes
-  - [ ] Project membership check for project and conversation routes
+  - [x] Role model: `admin`, `worker`
+  - [x] Dependency/guard for admin routes
+  - [x] Project membership check for project and conversation routes
 
 - Projects
-  - [ ] Extend `projects` with `system_instructions TEXT`
-  - [ ] `project_members` table (user_id, project_id, role_in_project)
-  - [ ] Endpoints:
+  - [x] Extend `projects` with `system_instructions TEXT`
+  - [x] `project_members` table (user_id, project_id, role_in_project)
+  - [x] Endpoints:
     - `GET /projects` (mine), `POST /projects` (admin), `GET /projects/{id}`
     - `PATCH /projects/{id}` (admin; includes system instructions)
     - `POST /projects/{id}/members` (admin), `DELETE /projects/{id}/members/{userId}` (admin)
 
 - Conversations/Messages
-  - [ ] Ensure `conversations` has `project_id`
-  - [ ] Enforce visibility: only members can access
-  - [ ] Endpoints:
+  - [x] Ensure `conversations` has `project_id`
+  - [x] Enforce visibility: only members can access
+  - [x] Endpoints:
     - `GET /projects/{id}/conversations`
     - `POST /projects/{id}/conversations`
     - `GET /conversations/{id}`, `DELETE /conversations/{id}` (owner/admin)
     - `POST /conversations/{id}/messages` (stream), `GET /conversations/{id}/messages`
 
 - LLM integration
-  - [ ] Compose prompt with `project.system_instructions` in `tgi_client` (or call site)
-  - [ ] Add trace metadata: project_id, conversation_id, user_id
+  - [x] Compose prompt with `project.system_instructions` in `tgi_client` (or call site)
+  - [x] Add trace metadata: project_id, conversation_id, user_id
 
 - Collaboration primitives
   - [ ] Presence: store ephemeral last_seen; optional WebSocket channel
@@ -159,39 +159,39 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
   - [ ] Mentions: parse `@` tokens, validate membership, create notification entries
 
 - Activity log
-  - [ ] `activity_logs` table: id, actor_id, action, object_type, object_id, project_id, created_at
+  - [x] `activity_logs` table: id, actor_id, action, object_type, object_id, project_id, created_at
 
 - Testing
   - [ ] Unit and integration tests for RBAC, project scoping, and LLM prompt composition
 
 ### Database (Alembic)
 - Migrations
-  - [ ] Add `system_instructions` to `projects`
-  - [ ] Create `project_members (project_id, user_id, role_in_project, created_at, unique(project_id,user_id))`
-  - [ ] Ensure `conversations.project_id` exists and is non-null
-  - [ ] `activity_logs` table
+  - [x] Add `system_instructions` to `projects`
+  - [x] Create `project_members (project_id, user_id, role_in_project, created_at, unique(project_id,user_id))`
+  - [x] Ensure `conversations.project_id` exists and is non-null
+  - [x] `activity_logs` table
   - [ ] `notifications` table (optional M4): id, user_id, type, data JSONB, read_at
 
 ### Frontend (Next.js App Router)
 - Auth
-  - [ ] `/` is the Google login page (button + explanation)
-  - [ ] Protect routes; fetch `/auth/me`; store user in global store
-  - [ ] Logout button
+  - [x] `/` is the Google login page (button + explanation)
+  - [x] Protect routes; fetch `/auth/me`; store user in global store
+  - [x] Logout button
 
 - Navigation
-  - [ ] `/projects` list (mine)
-  - [ ] `/projects/[projectId]` overview (members, activity, settings)
-  - [ ] `/projects/[projectId]/conversations/[conversationId]` chat UI
-  - [ ] `/admin` area for admins
+  - [x] `/projects` list (mine)
+  - [x] `/projects/[projectId]` basic page (auto-redirect to latest chat; full overview pending)
+  - [x] `/projects/[projectId]/conversations/[conversationId]` chat UI
+  - [x] `/admin` area for admins
 
 - Projects UI
-  - [ ] Create/edit project (admin)
-  - [ ] Manage members (admin)
+  - [x] Create/edit project (admin)
+  - [x] Manage members (admin)
   - [ ] System instructions editor (Markdown with preview)
 
 - Conversations UI
-  - [ ] Sidebar of project conversations with search
-  - [ ] Chat window with stream, mentions, pins
+  - [x] Sidebar of project conversations with search
+  - [x] Chat window with stream, mentions, pins
   - [ ] Presence/typing indicator
 
 - Collaboration
@@ -201,15 +201,15 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 
 - UX polish
   - [ ] Empty states, error boundaries, optimistic updates
-  - [ ] Loading skeletons and toasts
+  - [x] Loading skeletons and toasts
 
 ### Configuration and infra
-- [ ] Env vars:
+- [x] Env vars:
   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
   - `SESSION_SECRET`, `ALLOWED_GOOGLE_DOMAINS`
-- [ ] Update `infra/env.api.example` and `infra/docker-compose.yml`
-- [ ] Seed script for admin user and a demo project
-- [ ] Rate limit middleware (per IP/user)
+- [x] Update `infra/env.api.example` and `infra/docker-compose.yml`
+- [x] Seed script for admin user and a demo project
+- [x] Rate limit middleware (per IP/user)
 
 ---
 
@@ -233,9 +233,17 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 
 ---
 
-## Definition of done
-- Auth, RBAC, and project scoping enforced across API and UI
-- Per-project system instructions reliably affect LLM responses
-- Workers in the same project see and collaborate on shared conversations
-- Admin console functions (projects, members, audit) available and permissioned
-- Tests passing; docs updated; seeds provided
+## Immediate errors to handle
+- Fix test flakiness around database initialization:
+  - Ensure tables are created when using in-memory SQLite during tests (init before each request or use lifespan/fixtures).
+- Resolve NOT NULL constraint on `conversations.updated_at` in streaming flow (ensure value is always set without relying on nullable operations).
+- Align test environment to disable auth consistently without relying on external `.env.api`.
+
+## Next steps
+- Add unit tests for RBAC/membership guards and project scoping.
+- Implement project members management UI and API search for users.
+- Add conversations sidebar search/filter; optionally basic full-text.
+- Introduce presence/typing primitives (polling or WS) and notifications scaffold.
+- Admin console: projects table, recent activity view, and export transcripts.
+- Add rate limiting middleware and friendly errors.
+- Documentation polish and seed improvements.

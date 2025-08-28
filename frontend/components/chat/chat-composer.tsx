@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { streamChat } from "@/lib/stream";
-import { Send, Square, Settings2, Thermometer, Hash } from "lucide-react";
+import { Send, Square, Settings2, Thermometer, Hash, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface ChatComposerProps {
@@ -153,136 +154,266 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
 
   if (!selectedProjectId || !selectedConversationId) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
+      <motion.div 
+        className="p-6 text-center text-muted-foreground border-t border-border bg-muted/20"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <p className="text-sm">Select a conversation to start chatting</p>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="border-t border-border bg-background">
+    <motion.div 
+      className="border-t border-border bg-background/80 backdrop-blur-sm"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Advanced Settings */}
-      {showAdvanced && (
-        <div className="p-4 border-b border-border bg-muted/20 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="temp-slider" className="text-xs flex items-center gap-1">
-                  <Thermometer className="h-3 w-3" />
-                  Temperature
-                </Label>
-                <Badge variant="outline" className="h-5">
-                  {temperature[0]}
-                </Badge>
-              </div>
-              <Slider
-                id="temp-slider"
-                min={0}
-                max={2}
-                step={0.1}
-                value={temperature}
-                onValueChange={setTemperature}
-                className="w-full"
-              />
-            </div>
+      <AnimatePresence>
+        {showAdvanced && (
+          <motion.div 
+            className="border-b border-border bg-muted/30 backdrop-blur-sm"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
+          >
+            <div className="p-5 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <motion.div 
+                  className="space-y-3"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 }}
+                >
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="temp-slider" className="text-sm font-medium flex items-center gap-2">
+                      <Thermometer className="h-4 w-4 text-orange-500" />
+                      Temperature
+                    </Label>
+                    <Badge variant="secondary" className="h-6 px-3 font-mono">
+                      {temperature[0]}
+                    </Badge>
+                  </div>
+                  <Slider
+                    id="temp-slider"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={temperature}
+                    onValueChange={setTemperature}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Controls randomness (0=deterministic, 2=very creative)
+                  </p>
+                </motion.div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="tokens-slider" className="text-xs flex items-center gap-1">
-                  <Hash className="h-3 w-3" />
-                  Max Tokens
-                </Label>
-                <Badge variant="outline" className="h-5">
-                  {maxTokens[0]}
-                </Badge>
+                <motion.div 
+                  className="space-y-3"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.15 }}
+                >
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="tokens-slider" className="text-sm font-medium flex items-center gap-2">
+                      <Hash className="h-4 w-4 text-purple-500" />
+                      Max Tokens
+                    </Label>
+                    <Badge variant="secondary" className="h-6 px-3 font-mono">
+                      {maxTokens[0]}
+                    </Badge>
+                  </div>
+                  <Slider
+                    id="tokens-slider"
+                    min={50}
+                    max={4096}
+                    step={50}
+                    value={maxTokens}
+                    onValueChange={setMaxTokens}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum response length (higher=longer responses)
+                  </p>
+                </motion.div>
               </div>
-              <Slider
-                id="tokens-slider"
-                min={50}
-                max={4096}
-                step={50}
-                value={maxTokens}
-                onValueChange={setMaxTokens}
-                className="w-full"
-              />
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Composer */}
-      <div className="p-4">
-        <div className="flex gap-2">
+      <div className="p-5">
+        <motion.div 
+          className="flex gap-3"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
           <div className="flex-1">
-            <Textarea
-              ref={textareaRef}
-              placeholder={isStreaming ? "Generating response..." : "Type your message..."}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isStreaming}
-              className="min-h-[44px] max-h-[200px] resize-none border-0 bg-muted/50 focus-visible:ring-1"
-              rows={1}
-            />
+            <motion.div
+              className="relative"
+              whileFocus={{ scale: 1.01 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Textarea
+                ref={textareaRef}
+                placeholder={isStreaming ? "AI is thinking..." : "Type your message here..."}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isStreaming}
+                className={`min-h-[48px] max-h-[200px] resize-none border-2 bg-background/50 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/50 transition-all duration-200 ${
+                  isStreaming ? "opacity-75" : ""
+                }`}
+                rows={1}
+              />
+              {isStreaming && (
+                <motion.div
+                  className="absolute top-3 right-3"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                >
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </motion.div>
+              )}
+            </motion.div>
           </div>
           
-          <div className="flex flex-col gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="h-10 w-10"
+          <div className="flex flex-col gap-2">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <Settings2 className="h-4 w-4" />
-            </Button>
+              <Button
+                variant={showAdvanced ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="h-12 w-12 transition-all duration-200"
+              >
+                <motion.div
+                  animate={{ rotate: showAdvanced ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Settings2 className="h-5 w-5" />
+                </motion.div>
+              </Button>
+            </motion.div>
             
-            {isStreaming ? (
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={handleStop}
-                className="h-10 w-10"
-              >
-                <Square className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                size="icon"
-                onClick={handleSend}
-                disabled={!canSend}
-                className="h-10 w-10"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            )}
+            <AnimatePresence mode="wait">
+              {isStreaming ? (
+                <motion.div
+                  key="stop"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.8, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={handleStop}
+                    className="h-12 w-12"
+                  >
+                    <Square className="h-5 w-5" />
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="send"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.8, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  whileHover={{ scale: canSend ? 1.05 : 1 }}
+                  whileTap={{ scale: canSend ? 0.95 : 1 }}
+                >
+                  <Button
+                    size="icon"
+                    onClick={handleSend}
+                    disabled={!canSend}
+                    className={`h-12 w-12 transition-all duration-200 ${
+                      canSend 
+                        ? "bg-primary hover:bg-primary/90 shadow-lg" 
+                        : "bg-muted"
+                    }`}
+                  >
+                    <Send className="h-5 w-5" />
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+        <motion.div 
+          className="flex items-center justify-between mt-4 text-xs"
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
           <div className="flex items-center gap-4">
-            <span>
-              {isStreaming ? "Generating..." : "Press Enter to send, Shift+Enter for new line"}
-            </span>
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={isStreaming ? "generating" : "ready"}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                className={isStreaming ? "text-orange-600 font-medium" : "text-muted-foreground"}
+              >
+                {isStreaming ? (
+                  <span className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      className="w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full"
+                    />
+                    Generating response...
+                  </span>
+                ) : (
+                  "Press Enter to send, Shift+Enter for new line"
+                )}
+              </motion.span>
+            </AnimatePresence>
           </div>
           
           <div className="flex items-center gap-2">
-            {showAdvanced && (
-              <>
-                <Badge variant="outline" className="h-5">
-                  T: {temperature[0]}
-                </Badge>
-                <Badge variant="outline" className="h-5">
-                  Max: {maxTokens[0]}
-                </Badge>
-              </>
-            )}
+            <AnimatePresence>
+              {showAdvanced && (
+                <motion.div
+                  className="flex items-center gap-2"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Badge variant="outline" className="h-6 px-2 font-mono text-xs">
+                    T: {temperature[0]}
+                  </Badge>
+                  <Badge variant="outline" className="h-6 px-2 font-mono text-xs">
+                    Max: {maxTokens[0]}
+                  </Badge>
+                </motion.div>
+              )}
+            </AnimatePresence>
             
-            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+            <motion.kbd 
+              className="pointer-events-none hidden h-6 select-none items-center gap-1 rounded border bg-muted px-2 font-mono text-[10px] font-medium opacity-100 sm:flex"
+              whileHover={{ scale: 1.05 }}
+            >
               <span className="text-xs">⌘</span>↵
-            </kbd>
+            </motion.kbd>
           </div>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

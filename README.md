@@ -43,6 +43,13 @@ Backend env (can be set in container or shell):
 - `CORS_ORIGIN` (default: http://localhost:3000)
 - `TEMPERATURE`, `MAX_TOKENS`
 
+Auth (optional):
+- `ENABLE_AUTH` (default: false)
+- `SESSION_SECRET`
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+- `ALLOWED_GOOGLE_DOMAINS` (comma-separated)
+- `ADMIN_EMAILS` (bootstrap admin emails)
+
 TGI env:
 - `MODEL_ID` (default: meta-llama/Meta-Llama-3.1-8B-Instruct)
 - `MAX_INPUT_TOKENS`, `MAX_TOTAL_TOKENS` (default: 8192)

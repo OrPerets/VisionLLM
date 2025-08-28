@@ -1,0 +1,54 @@
+services:
+  db:
+    # Keep Postgres internal-only in prod
+    ports: []
+    restart: unless-stopped
+
+  tgi:
+    # Keep model server internal-only in prod
+    ports: []
+    restart: unless-stopped
+    profiles: [gpu]
+    environment:
+      - MODEL_ID=${MODEL_ID:-meta-llama/Meta-Llama-3.1-8B-Instruct}
+      - HF_HOME=/data/.cache/huggingface
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    # Uncomment to enable GPU via NVIDIA Container Toolkit
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+    #           driver: nvidia
+    #           count: all
+
+  api:
+    restart: unless-stopped
+    environment:
+      # Ensure API trusts the web origin (set to your web URL)
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      # Use TGI in production by default
+      - MODEL_BACKEND=${MODEL_BACKEND:-tgi}
+      # Default model id used for metadata/UI (TGI loads via tgi.MODEL_ID)
+      - DEFAULT_MODEL_ID=${DEFAULT_MODEL_ID:-meta-llama/Meta-Llama-3.1-8B-Instruct}
+    # Expose API to your network; front with a reverse proxy or LB if desired
+    ports:
+      - "8000:8000"
+
+  web:
+    restart: unless-stopped
+    build:
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000/api}
+    environment:
+      - NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE:-http://localhost:8000/api}
+    # Expose web to your network
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
+  hf_cache:
+
+
