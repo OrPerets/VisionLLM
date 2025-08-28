@@ -1,10 +1,10 @@
-## VisionBI In-House AI Assistant — Web (FastAPI + Next.js + TGI)
+## VisionBI In-House AI Assistant — Web (FastAPI + Next.js + TGI/Ollama)
 
-This repository now delivers a production-ready, on‑prem web AI assistant with:
+This repository delivers a production-ready, on‑prem web AI assistant with:
 - FastAPI backend with SSE streaming, projects/conversations/messages, SQL tools.
-- Hugging Face Text Generation Inference (TGI) model server that loads once and is shared.
+- Pluggable LLM backends: Hugging Face Text Generation Inference (TGI) or Ollama.
 - Next.js frontend with modern UX (chat UI, code toolbar, logs, diff viewer, preferences).
-- Docker Compose stack: `tgi`, `api`, `db`, `web`.
+- Docker Compose stack: `tgi` (or host Ollama), `api`, `db`, `web`.
 
 ### Dev Quickstart (Docker, recommended)
 ```bash
@@ -24,7 +24,9 @@ python3 -m venv .venv && source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# Start backend on :8000 (expects TGI at http://localhost:8080)
+# Start backend on :8000
+# Option A: with TGI at http://localhost:8080
+# Option B: with local Ollama at http://localhost:11434
 make backend-dev
 ```
 
@@ -32,16 +34,26 @@ make backend-dev
 - `backend/`: FastAPI app, models, routers, services, Alembic, tests
 - `infra/`: docker-compose, volumes
 - `tools/sql_tools.py`: SQL transpile and lint/fix used by the API
-- `frontend/`: Next.js app (added in this migration)
+- `frontend/`: Next.js app
 - `docs/`: RUNBOOK and DEPLOY guides
 
 ### Configuration
 Backend env (can be set in container or shell):
-- `DATABASE_URL` (default: Postgres in compose)
-- `MODEL_SERVER_URL` (default: http://tgi:8080)
+- `ENVIRONMENT` (default: dev)
+- `DATABASE_URL` (default: sqlite:///./visionbi.db locally; Postgres in compose)
+- `MODEL_BACKEND` (default: tgi; options: `tgi` or `ollama`)
+- `MODEL_SERVER_URL` (default: http://tgi:8080 when using TGI)
 - `DEFAULT_MODEL_ID` (default: meta-llama/Meta-Llama-3.1-8B-Instruct)
+- `MAX_INPUT_TOKENS` (default: 8192)
+- `MAX_TOTAL_TOKENS` (default: 8192)
+- `TEMPERATURE` (default: 0.2)
+- `MAX_TOKENS` (default: 800)
 - `CORS_ORIGIN` (default: http://localhost:3000)
-- `TEMPERATURE`, `MAX_TOKENS`
+- `FRONTEND_URL` (optional)
+
+Ollama (if `MODEL_BACKEND=ollama`):
+- `OLLAMA_URL` (default: http://host.docker.internal:11434)
+- `OLLAMA_MODEL` (default: llama3.2:3b-instruct)
 
 Auth (optional):
 - `ENABLE_AUTH` (default: false)
@@ -51,28 +63,29 @@ Auth (optional):
 - `ADMIN_EMAILS` (bootstrap admin emails)
 
 TGI env:
-- `MODEL_ID` (default: meta-llama/Meta-Llama-3.1-8B-Instruct)
-- `MAX_INPUT_TOKENS`, `MAX_TOTAL_TOKENS` (default: 8192)
+- `MODEL_ID` (e.g., meta-llama/Meta-Llama-3.1-8B-Instruct)
+- `MAX_INPUT_TOKENS`, `MAX_TOTAL_TOKENS`
 
 ### API Endpoints (high-level)
 - `GET /api/health`, `GET /api/meta`
+- Auth: `POST /api/auth/login` (if enabled)
 - Projects CRUD: `/api/projects`
 - Conversations CRUD: `/api/projects/:id/conversations`, `/api/conversations/:id`
-- Messages list: `/api/conversations/:id/messages`
+- Messages: `/api/conversations/:id/messages`
 - Chat SSE: `POST /api/chat/stream`
 - SQL tools: `/api/sql/transpile`, `/api/sql/lint`
 
 ### On‑prem Deploy (summary)
 1) Provision a Docker host with GPU if desired (TGI benefits from GPU).
-2) Prepare a persistent volume for `hf_cache` to ensure one‑time model download.
-3) Set `MODEL_ID` and other envs as needed.
+2) Prepare persistent volumes for Postgres and `hf_cache`.
+3) Set `MODEL_ID` (TGI) or configure `MODEL_BACKEND=ollama` and `OLLAMA_*`.
 4) `docker compose -f infra/docker-compose.yml up -d`.
 5) Point users to the internal URL of the `web` service.
 
 See `docs/DEPLOY.md` for detailed on‑prem guidance and cache pre-seeding.
 
 ### SQL Tools parity
-The backend reuses the existing `tools/sql_tools.py` for transpile and lint/fix to preserve behavior.
+The backend uses `tools/sql_tools.py` for transpile and lint/fix.
 
 ### Design tokens
 Preserved from the desktop app (accent `#2563eb`, neutrals, spacing, radius, font sizes) and applied in the web UI.
