@@ -66,11 +66,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ProtectedRoute requireAuth={false} key="login">
                 {children}
               </ProtectedRoute>
+            ) : isAdminRoute ? (
+              // Admin routes - full page without AppShell
+              <ProtectedRoute 
+                requireAuth={true} 
+                adminOnly={true}
+                key="admin"
+              >
+                {children}
+                <CommandPalette />
+              </ProtectedRoute>
             ) : (
               // Protected routes with AppShell
               <ProtectedRoute 
                 requireAuth={true} 
-                adminOnly={isAdminRoute}
+                adminOnly={false}
                 key="protected"
               >
                 <AppShell>

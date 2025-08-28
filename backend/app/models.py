@@ -120,3 +120,66 @@ class ProjectMember(Base):
         Index("idx_project_members_user_id", "user_id"),
     )
 
+
+class LLMProvider(Base):
+    __tablename__ = "llm_providers"
+
+    id = Column(Integer, primary_key=True)
+    # Provider type identifier, e.g., "openai", "gemini"
+    provider = Column(String(50), nullable=False, unique=True)
+    # Optional display name/label for UI
+    name = Column(String(255), nullable=True)
+    # Secret credentials (stored as plaintext for now; consider KMS/Vault in production)
+    api_key = Column(Text, nullable=True)
+    # Optional base URL (e.g., for Azure OpenAI or compatible APIs)
+    base_url = Column(String(1024), nullable=True)
+    # Optional organization or project identifiers
+    organization = Column(String(255), nullable=True)
+    project = Column(String(255), nullable=True)
+    # Arbitrary extra config (e.g., allowed models)
+    config_json = Column(JSON, nullable=True)
+    # Enable/disable provider
+    enabled = Column(Integer, nullable=False, default=1)  # 1=true, 0=false for SQLite simplicity
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+
+class Agent(Base):
+    __tablename__ = "agents"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    product = Column(String(50), nullable=False)  # snowflake|dbt|tableau
+    description = Column(Text, nullable=True)
+    categories_json = Column(JSON, nullable=True)  # list[str]
+    tags_json = Column(JSON, nullable=True)       # list[str]
+    system_instructions = Column(Text, nullable=False)
+    knowledge_urls_json = Column(JSON, nullable=True)  # list[str]
+    defaults_json = Column(JSON, nullable=True)   # e.g., model_id, temperature, flags
+    is_enabled = Column(Integer, nullable=False, default=1)  # 1=true, 0=false for SQLite friendliness
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("name", "product", name="uq_agents_name_product"),
+        Index("idx_agents_product", "product"),
+    )
+
+    # JSON alias properties for API serialization
+    @property
+    def categories(self) -> Optional[list]:
+        return self.categories_json
+
+    @property
+    def tags(self) -> Optional[list]:
+        return self.tags_json
+
+    @property
+    def knowledge_urls(self) -> Optional[list]:
+        return self.knowledge_urls_json
+
+    @property
+    def defaults(self) -> Optional[dict]:
+        return self.defaults_json

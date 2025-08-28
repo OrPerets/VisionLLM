@@ -189,16 +189,16 @@ export function ChatWindow() {
 
   return (
     <motion.div 
-      className="relative h-full"
+      className="relative h-full group"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Export controls */}
+      {/* Export controls - repositioned to avoid overlap */}
       <motion.div 
-        className="absolute top-4 right-4 z-10 flex gap-2"
+        className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
+        animate={{ opacity: 0, y: 0 }}
         transition={{ delay: 0.2 }}
       >
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -221,9 +221,9 @@ export function ChatWindow() {
                 toast.error("Export failed");
               }
             }}
-            className="h-9 bg-background/60 backdrop-blur-sm border-border/50 hover:bg-background/80"
+            className="h-8 px-3 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-background/90 shadow-sm text-xs"
           >
-            <Download className="h-4 w-4 mr-2" /> JSON
+            <Download className="h-3 w-3 mr-1.5" /> JSON
           </Button>
         </motion.div>
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -246,9 +246,9 @@ export function ChatWindow() {
                 toast.error("Export failed");
               }
             }}
-            className="h-9 bg-background/60 backdrop-blur-sm border-border/50 hover:bg-background/80"
+            className="h-8 px-3 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-background/90 shadow-sm text-xs"
           >
-            <Download className="h-4 w-4 mr-2" /> MD
+            <Download className="h-3 w-3 mr-1.5" /> MD
           </Button>
         </motion.div>
       </motion.div>
@@ -316,7 +316,7 @@ export function ChatWindow() {
       <AnimatePresence>
         {showScrollToBottom && (
           <motion.div 
-            className="absolute bottom-6 right-6"
+            className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30"
             initial={{ opacity: 0, scale: 0.8, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -334,7 +334,7 @@ export function ChatWindow() {
                 variant="outline"
                 size="icon"
                 onClick={handleScrollToBottom}
-                className="h-12 w-12 rounded-full shadow-lg bg-background/80 backdrop-blur-sm border-2 border-border/50 hover:bg-background hover:border-border"
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shadow-lg bg-background/90 backdrop-blur-sm border-2 border-border/50 hover:bg-background hover:border-border hover:shadow-xl transition-all duration-200"
               >
                 <motion.div
                   animate={{ y: [0, 2, 0] }}
@@ -344,7 +344,7 @@ export function ChatWindow() {
                     ease: "easeInOut"
                   }}
                 >
-                  <ArrowDown className="h-5 w-5" />
+                  <ArrowDown className="h-4 w-4 sm:h-5 sm:w-5" />
                 </motion.div>
               </Button>
             </motion.div>

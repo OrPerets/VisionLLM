@@ -10,7 +10,61 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Save, Settings } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getModels } from "@/lib/api";
 import { toast } from "sonner";
+
+// Persona templates for quick system-instruction presets
+const PERSONA_TEMPLATES: Record<string, string> = {
+  Analyst: [
+    "You are a senior Data Analyst.",
+    "- Understand the business question first; ask for missing context (entities, timeframe, grain).",
+    "- Prefer clear, minimal SQL with readable CTEs, meaningful aliases, and comments when needed.",
+    "- Validate assumptions explicitly; if schema/tables are unknown, ask for a quick schema sample.",
+    "- When returning results, outline steps briefly and provide runnable SQL in the target dialect.",
+    "- Optimize for correctness first, then performance; highlight trade-offs and caveats succinctly.",
+  ].join("\n"),
+  "Data Engineer": [
+    "You are a senior Data Engineer for ETL/ELT and data platforms.",
+    "- Design reliable, idempotent pipelines; call out SCD handling, deduping, and data quality checks.",
+    "- Provide concise architectures (staging → cleansed → marts) and scheduling/orchestration guidance.",
+    "- Prefer modular SQL and/or Python examples; surface partitioning, incremental loads, and backfills.",
+    "- Address performance (indexes/cluster keys, pruning, predicate pushdown) and cost awareness.",
+    "- If requirements are ambiguous, ask targeted questions to unblock implementation.",
+  ].join("\n"),
+  "BI Dev": [
+    "You are a senior BI Developer focused on metrics, dashboards, and semantic modeling.",
+    "- Define clear metric semantics (grain, filters, dims) and consistent naming conventions.",
+    "- Propose star-schema friendly models (facts/dims) and describe joins and primary keys.",
+    "- Provide performant SQL powering dashboards; avoid unnecessary cross-joins and heavy windowing.",
+    "- Recommend UX best practices (filters, drilldowns, tooltips) and performant aggregation strategies.",
+    "- Clarify KPIs and edge cases before finalizing queries; note data-quality risks.",
+  ].join("\n"),
+  Snowflake: [
+    "You are a Snowflake expert.",
+    "- Use Snowflake SQL; leverage warehouses, micro-partition pruning, clustering, and RESULT_SCAN prudently.",
+    "- Prefer CTAS/temporary tables for heavy transforms; consider TASKS/STREAMS for incremental loads.",
+    "- Call out time-travel, zero-copy cloning, and materialized views when appropriate.",
+    "- Optimize for cost and performance: avoid SELECT *, limit scans, and use QUALIFY for window filters.",
+    "- If schema unknown, ask for DESCRIBE or INFORMATION_SCHEMA samples before proposing specifics.",
+  ].join("\n"),
+  Tableau: [
+    "You are a Tableau expert.",
+    "- Provide precise Calculated Field and LOD expression syntax with brief explanations.",
+    "- Optimize workbook performance (extracts, aggregation, context filters, reducing row-level calcs).",
+    "- Recommend clear viz choices and dashboard structure; note formatting and interaction best practices.",
+    "- When feasible, move heavy logic to SQL; otherwise use LOD/table calcs with rationale.",
+    "- Ask for data structure (dimensions/measures, joins/blends) if unclear before prescribing a solution.",
+  ].join("\n"),
+  DBT: [
+    "You are a senior dbt practitioner.",
+    "- Provide dbt model examples with Jinja, configs (materialized, unique/cluster keys), and incremental strategies.",
+    "- Include tests and documentation snippets in schema.yml; suggest sources/exposures appropriately.",
+    "- Favor modular models and reusable macros; explain trade-offs (ephemeral vs table vs incremental).",
+    "- Address environments, CI, and artifacts (docs generation, freshness) where relevant.",
+    "- Ask for existing project structure if unknown (models/, seeds/, snapshots/, macros/).",
+  ].join("\n"),
+};
 
 export function ProjectSettings() {
   const {
@@ -26,6 +80,9 @@ export function ProjectSettings() {
   const [maxTokens, setMaxTokens] = useState([2048]);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [models, setModels] = useState<{ name: string }[]>([]);
+  const [modelId, setModelId] = useState<string | undefined>(undefined);
+  const [persona, setPersona] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (currentProject) {
@@ -33,9 +90,17 @@ export function ProjectSettings() {
       const defaults = currentProject.defaults || {};
       setTemperature([defaults.temperature || 0.7]);
       setMaxTokens([defaults.max_tokens || 2048]);
+      setModelId(defaults.model_id || undefined);
       setHasChanges(false);
     }
   }, [currentProject]);
+
+  // Keep persona selection in sync with the current system instructions
+  useEffect(() => {
+    const trimmed = (systemInstructions || "").trim();
+    const match = Object.entries(PERSONA_TEMPLATES).find(([, tpl]) => tpl.trim() === trimmed);
+    setPersona(match ? match[0] : undefined);
+  }, [systemInstructions]);
 
   useEffect(() => {
     if (currentProject) {
@@ -43,10 +108,21 @@ export function ProjectSettings() {
       const hasSystemChanges = systemInstructions !== (currentProject.system_instructions || "");
       const hasTempChanges = temperature[0] !== (currentDefaults.temperature || 0.7);
       const hasTokenChanges = maxTokens[0] !== (currentDefaults.max_tokens || 2048);
+      const hasModelChanges = (modelId || undefined) !== (currentDefaults.model_id || undefined);
       
-      setHasChanges(hasSystemChanges || hasTempChanges || hasTokenChanges);
+      setHasChanges(hasSystemChanges || hasTempChanges || hasTokenChanges || hasModelChanges);
     }
-  }, [systemInstructions, temperature, maxTokens, currentProject]);
+  }, [systemInstructions, temperature, maxTokens, modelId, currentProject]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const info = await getModels();
+        const list = (info.models || []).map((m) => ({ name: m.name }));
+        setModels(list);
+      } catch (e) {}
+    })();
+  }, []);
 
   const handleSave = async () => {
     if (!selectedProjectId || !currentProject) return;
@@ -58,6 +134,7 @@ export function ProjectSettings() {
         defaults: {
           temperature: temperature[0],
           max_tokens: maxTokens[0],
+          model_id: modelId,
         },
       });
       
@@ -112,6 +189,32 @@ export function ProjectSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Persona selector */}
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="persona">Persona</Label>
+                {persona ? <Badge variant="outline" className="font-mono">{persona}</Badge> : null}
+              </div>
+              <Select
+                value={persona}
+                onValueChange={(value) => {
+                  setPersona(value);
+                  const tpl = PERSONA_TEMPLATES[value];
+                  if (tpl) setSystemInstructions(tpl);
+                }}
+              >
+                <SelectTrigger id="persona" className="w-full">
+                  <SelectValue placeholder="Choose persona" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(PERSONA_TEMPLATES).map((key) => (
+                    <SelectItem key={key} value={key}>{key}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Selecting a persona will replace the current system instructions.</p>
+            </div>
+
             <Textarea
               placeholder="Enter system instructions..."
               value={systemInstructions}
@@ -133,6 +236,27 @@ export function ProjectSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Model selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="model-id">Default Model</Label>
+                <Badge variant="outline" className="font-mono">{modelId || "—"}</Badge>
+              </div>
+              <Select value={modelId} onValueChange={setModelId}>
+                <SelectTrigger id="model-id" className="w-full">
+                  <SelectValue placeholder="Select default model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => (
+                    <SelectItem key={m.name} value={m.name}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Default model for chats in this project. Users can override per message.
+              </p>
+            </div>
+
             {/* Temperature */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">

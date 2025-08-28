@@ -1,0 +1,8 @@
+embed_model: "intfloat/e5-large-v2"
+reranker: "BAAI/bge-reranker-v2-m3"
+top_k: 12
+rerank_k: 5
+diversity_penalty: 0.12
+low_conf_threshold: 0.52
+
+

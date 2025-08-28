@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncGenerator, Dict, List, Tuple
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -16,7 +17,25 @@ from ..schemas import ChatStreamRequest
 from ..config import settings
 from ..services.tgi_client import client as tgi
 from ..services.tgi_client import ollama_client
+from ..services.provider_clients import stream_generate_with_provider
 
+# Optional SQL tools import for Phase 2 (lint/format)
+try:
+    from tools.sql_tools import lint_sql  # type: ignore
+except Exception:  # pragma: no cover - fallback for local/dev paths
+    import os as _os
+    import sys as _sys
+    _repo_root = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../.."))
+    if _repo_root not in _sys.path:
+        _sys.path.append(_repo_root)
+    try:
+        from tools.sql_tools import lint_sql  # type: ignore
+    except Exception:
+        # As a last resort, attempt direct import from tools dir
+        _tools_dir = _os.path.join(_repo_root, "tools")
+        if _tools_dir not in _sys.path:
+            _sys.path.append(_tools_dir)
+        from sql_tools import lint_sql  # type: ignore
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -51,14 +70,103 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
         .order_by(models.Message.created_at.asc())
         .all()
     )
-    system_prompt = request.system_override or project.system_instructions
+    # Resolve agent (if provided) and build effective system prompt and defaults
+    agent = None
+    if request.agent_id is not None:
+        try:
+            agent = db.query(models.Agent).get(int(request.agent_id))
+            if agent and not bool(agent.is_enabled):
+                agent = None
+        except Exception:
+            agent = None
 
-    temperature = request.temperature or (project.defaults_json or {}).get("temperature", settings.temperature)
-    max_tokens = request.max_tokens or (project.defaults_json or {}).get("max_tokens", settings.max_tokens)
-    model_id = (project.defaults_json or {}).get("model_id", settings.default_model_id)
+    system_prompt = request.system_override or (agent.system_instructions if agent and agent.system_instructions else project.system_instructions)
+
+    # Apply defaults with precedence: explicit request > agent.defaults > project.defaults > settings
+    agent_defaults = (agent.defaults_json or {}) if agent else {}
+    project_defaults = project.defaults_json or {}
+    temperature = request.temperature or agent_defaults.get("temperature") or project_defaults.get("temperature", settings.temperature)
+    max_tokens = request.max_tokens or agent_defaults.get("max_tokens") or project_defaults.get("max_tokens", settings.max_tokens)
+    # Determine effective model for this request (for display and for Ollama override)
+    model_id = (
+        request.model_id
+        or agent_defaults.get("model_id")
+        or project_defaults.get("model_id")
+        or settings.default_model_id
+    )
 
     # Note: We do not swap model on TGI at runtime; model_id is for display/storage
-    prompt = build_prompt(system_prompt, history, request.user_text)
+    rag_context = None
+    citations: list[dict] = []
+    confidence_score: float | None = None
+    low_confidence: bool = False
+    if request.use_rag:
+        try:
+            import os
+            import sys
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+            if repo_root not in sys.path:
+                sys.path.append(repo_root)
+            from core.retrieval.retriever import hybrid_search
+            from core.retrieval.reranker import rerank
+
+            candidates = hybrid_search(request.user_text, top_k=request.top_k or 12)
+            final = rerank(request.user_text, candidates, k=min(5, request.top_k or 12))
+            # Compute a simple confidence score based on query-term overlap
+            def _q_terms(text: str) -> set[str]:
+                return set(t.lower() for t in re.findall(r"[A-Za-z0-9_]+", text or ""))
+
+            q_terms = _q_terms(request.user_text)
+            def _overlap_ratio(chunk_text: str) -> float:
+                if not q_terms:
+                    return 0.0
+                terms = _q_terms(chunk_text)
+                overlap = len(q_terms & terms)
+                denom = max(6, len(q_terms))  # avoid inflated scores for very short queries
+                return min(1.0, overlap / denom)
+
+            # Build context block and citations
+            context_blocks = []
+            per_chunk_scores: list[float] = []
+            for c in final:
+                text_for_score = f"{c.title or ''}\n{c.content_md or ''}"
+                rscore = _overlap_ratio(text_for_score)
+                per_chunk_scores.append(rscore)
+                citations.append({
+                    "id": c.id,
+                    "title": c.title,
+                    "url": c.url,
+                    "product": c.product,
+                    "score": getattr(c, "score", None),
+                    "rerank_score": rscore,
+                })
+                context_blocks.append(f"Title: {c.title}\nURL: {c.url}\n---\n{c.content_md}\n")
+            rag_context = "\n\n".join(context_blocks)
+            confidence_score = (max(per_chunk_scores) if per_chunk_scores else 0.0)
+            threshold = request.low_conf_threshold or 0.52
+            low_confidence = (confidence_score or 0.0) < threshold
+        except Exception as e:
+            rag_context = None
+
+    user_text = request.user_text
+    if rag_context:
+        if low_confidence:
+            user_text = (
+                "You are a Senior Architect for Snowflake/dbt/Tableau. Cite sources.\n"
+                "Your retrieval confidence appears LOW.\n"
+                "Do ONE of the following:\n"
+                "- Ask ONE concise clarifying question that would let you answer precisely, OR\n"
+                "- Present 2–3 likely interpretations, each with: short answer, a SQL/code snippet if relevant, and sources.\n\n"
+                f"CONTEXT:\n{rag_context}\n\nQUESTION: {request.user_text}"
+            )
+        else:
+            user_text = (
+                "You are a Senior Architect for Snowflake/dbt/Tableau. Cite sources.\n"
+                "Use the CONTEXT below to answer. If insufficient, say so and ask a clarifying question.\n\n"
+                f"CONTEXT:\n{rag_context}\n\nQUESTION: {request.user_text}"
+            )
+
+    prompt = build_prompt(system_prompt, history, user_text)
 
     # Persist user message immediately
     user_msg = models.Message(
@@ -75,13 +183,51 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
     num_tokens = 0
     collected_text: List[str] = []
 
-    # Choose backend: ollama for fastest local POC on macOS, otherwise TGI
+    # Choose backend: support explicit provider prefix `provider:model`
     backend = "ollama" if settings.model_backend.lower() == "ollama" else "tgi"
-    generator = (
-        ollama_client.stream_generate(prompt, temperature=temperature, max_new_tokens=max_tokens)
-        if backend == "ollama"
-        else tgi.stream_generate(prompt, temperature=temperature, max_new_tokens=max_tokens)
-    )
+    generator = None
+    provider_name: str | None = None
+    provider_model: str | None = None
+    if model_id and ":" in model_id:
+        provider_name, provider_model = model_id.split(":", 1)
+        provider_name = (provider_name or "").strip().lower()
+        provider_model = (provider_model or "").strip()
+        # Look up provider credentials (case-insensitive)
+        try:
+            from sqlalchemy import func
+            provider_row = (
+                db.query(models.LLMProvider)
+                .filter(func.lower(models.LLMProvider.provider) == provider_name, models.LLMProvider.enabled == 1)
+                .first()
+            )
+            if provider_row and provider_row.api_key:
+                backend = provider_name
+                generator = stream_generate_with_provider(
+                    provider=provider_row.provider,
+                    api_key=provider_row.api_key,
+                    base_url=provider_row.base_url,
+                    organization=provider_row.organization,
+                    project=provider_row.project,
+                    model=provider_model,
+                    prompt=prompt,
+                    temperature=temperature,
+                    max_new_tokens=max_tokens,
+                    stop=None,
+                )
+        except Exception:
+            generator = None
+
+    if generator is None:
+        generator = (
+            ollama_client.stream_generate(
+                prompt,
+                temperature=temperature,
+                max_new_tokens=max_tokens,
+                model=model_id,
+            )
+            if backend == "ollama"
+            else tgi.stream_generate(prompt, temperature=temperature, max_new_tokens=max_tokens)
+        )
 
     async for item in generator:
         if "token" in item:
@@ -96,6 +242,50 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
     elapsed = max(1e-6, time.perf_counter() - start_ts)
     tokens_per_sec = num_tokens / elapsed if num_tokens else None
     assistant_text = "".join(collected_text)
+
+    # Phase 2: SQL tools integration — if response includes SQL, append lint/format suggestions
+    def _extract_sql_blocks(text: str) -> List[Tuple[str, str]]:
+        pattern = re.compile(r"```(\w+)?\n([\s\S]*?)```", re.MULTILINE)
+        matches = pattern.findall(text or "")
+        results: List[Tuple[str, str]] = []
+        for lang, code in matches[:3]:  # limit to first 3 blocks to bound latency
+            lang_lower = (lang or "sql").lower()
+            if lang_lower in {"sql", "snowflake", "bigquery", "postgres", "postgresql", "mysql", "duckdb", "sqlite", "redshift", "mssql"}:
+                results.append((lang_lower, code.strip()))
+        return results
+
+    def _pick_dialect(preferred: str | None, citations_list: list[dict]) -> str:
+        if preferred and preferred != "sql":
+            return "postgres" if preferred == "postgresql" else preferred
+        # Heuristic from citations
+        domain_products = [(c or {}).get("product", "") for c in (citations_list or [])]
+        if any("snowflake" in (p or "").lower() for p in domain_products):
+            return "snowflake"
+        if any("bigquery" in (p or "").lower() for p in domain_products):
+            return "bigquery"
+        return "postgres"
+
+    appended_tools_text = ""
+    try:
+        sql_blocks = _extract_sql_blocks(assistant_text)
+        if sql_blocks:
+            analyses: List[str] = []
+            for idx, (lang, code) in enumerate(sql_blocks, start=1):
+                dialect = _pick_dialect(lang, citations)
+                try:
+                    report = lint_sql(code, dialect=dialect)
+                except Exception:
+                    report = "SQL tools failed to analyze this block."
+                analyses.append(f"Block {idx} [{dialect}]:\n{report}".strip())
+            if analyses:
+                appended_tools_text = "\n\n---\nSQL tools analysis\n\n" + "\n\n".join(analyses)
+    except Exception:
+        appended_tools_text = ""
+
+    if appended_tools_text:
+        assistant_text += appended_tools_text
+        # Stream the tools section as one final delta chunk so the UI sees it without reload
+        yield f"event: delta\ndata: {json.dumps({'text': appended_tools_text})}\n\n"
 
     # Persist assistant message with meta
     # Attach trace metadata
@@ -116,12 +306,22 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
         "conversation_id": conversation.id,
         "user_id": (current_user.id if current_user else None),
     }
+    if agent:
+        meta["agent"] = {
+            "id": agent.id,
+            "name": agent.name,
+            "product": agent.product,
+        }
+    # Low-confidence indicators
+    if confidence_score is not None:
+        meta["confidence_score"] = confidence_score
+        meta["low_confidence"] = low_confidence
 
     assistant_msg = models.Message(
         conversation_id=conversation.id,
         role="assistant",
         content=assistant_text,
-        meta_json=meta,
+        meta_json={**meta, "citations": citations if citations else None},
     )
     db.add(assistant_msg)
     # Ensure updated_at is not None

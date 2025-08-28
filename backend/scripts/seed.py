@@ -37,6 +37,59 @@ def main() -> None:
                 member = models.ProjectMember(project_id=p.id, user_id=admin_user.id, role_in_project="admin")
                 db.add(member)
                 db.commit()
+
+        # Seed sample agents if none exist
+        if db.query(models.Agent).count() == 0:
+            agents = [
+                models.Agent(
+                    name="Snowflake Analyst",
+                    product="snowflake",
+                    description="Expert in Snowflake SQL, optimization, and best practices.",
+                    categories_json=["sql", "analytics", "warehouse"],
+                    tags_json=["snowflake", "sql", "performance"],
+                    system_instructions=(
+                        "You are a Snowflake expert. Prefer ANSI SQL. Provide concise answers with runnable SQL."
+                    ),
+                    knowledge_urls_json=[
+                        "https://docs.snowflake.com/en/", 
+                    ],
+                    defaults_json={"model_id": settings.default_model_id, "temperature": 0.2, "max_tokens": 800},
+                    is_enabled=1,
+                ),
+                models.Agent(
+                    name="dbt Developer",
+                    product="dbt",
+                    description="Helps design models, tests, and macros for dbt projects.",
+                    categories_json=["data modeling", "testing"],
+                    tags_json=["dbt", "jinja", "macro"],
+                    system_instructions=(
+                        "You are a senior dbt developer. Use dbt conventions, write models and tests with clear rationale."
+                    ),
+                    knowledge_urls_json=[
+                        "https://docs.getdbt.com/",
+                    ],
+                    defaults_json={"model_id": settings.default_model_id, "temperature": 0.25, "max_tokens": 900},
+                    is_enabled=1,
+                ),
+                models.Agent(
+                    name="Tableau Analyst",
+                    product="tableau",
+                    description="Guides dashboard design and calculations in Tableau.",
+                    categories_json=["viz", "analytics"],
+                    tags_json=["tableau", "lod", "calculation"],
+                    system_instructions=(
+                        "You are a Tableau expert. Provide practical tips and LOD examples; explain clearly."
+                    ),
+                    knowledge_urls_json=[
+                        "https://help.tableau.com/current/pro/desktop/en-us/help.htm",
+                    ],
+                    defaults_json={"model_id": settings.default_model_id, "temperature": 0.3, "max_tokens": 700},
+                    is_enabled=1,
+                ),
+            ]
+            for a in agents:
+                db.add(a)
+            db.commit()
     finally:
         db.close()
 

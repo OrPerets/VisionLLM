@@ -56,6 +56,8 @@ def create_app() -> FastAPI:
 	app.include_router(auth_router.router, prefix="/api")
 	from .routers import admin as admin_router
 	app.include_router(admin_router.router, prefix="/api")
+	from .routers import agents as agents_router
+	app.include_router(agents_router.router, prefix="/api")
 
 	# Simple in-memory rate limiter (per IP) — best-effort only
 	if settings.rate_limit_enabled:
@@ -89,7 +91,7 @@ def create_app() -> FastAPI:
 		# In test runs, reset SQLite DB file to ensure clean state between invocations
 		try:
 			if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("DISABLE_ENV_FILE_FOR_TESTS") == "1":
-				if settings.database_url.startswith("sqlite///") or settings.database_url.startswith("sqlite:///"):
+				if settings.database_url.startswith("sqlite///") or settings.database_url.startswith("sqlite///"):
 					db_path = settings.database_url.replace("sqlite:///", "")
 					abs_path = os.path.abspath(db_path)
 					try:

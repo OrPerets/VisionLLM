@@ -82,10 +82,11 @@ class OllamaClient:
         temperature: float,
         max_new_tokens: int,
         stop: List[str] | None = None,
+        model: str | None = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         url = f"{self.base_url}/api/chat"
         payload = {
-            "model": self.model,
+            "model": model or self.model,
             "messages": [
                 {"role": "user", "content": prompt},
             ],

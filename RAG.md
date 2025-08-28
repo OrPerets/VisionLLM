@@ -12,12 +12,12 @@ A step-by-step plan to add **Retrieval-Augmented Generation (RAG)** to this proj
 ---
 
 ## 1) Repo Structure Additions
-- [ ] Create directories:
+- [x] Create directories:
   - `ingestion/` (ETL scripts)
   - `core/retrieval/` (retriever, reranker, composer)
   - `configs/` (retrieval, sources)
   - `eval/` (questions + grader)
-- [ ] Add `Makefile` targets for ingest, reindex, eval.
+- [x] Add `Makefile` targets for ingest, reindex, eval.
 - **Acceptance:** `tree` shows new dirs; `make ingest` runs end-to-end (stub OK).
 
 ```bash
@@ -28,10 +28,10 @@ mkdir -p ingestion core/retrieval configs eval
 
 ## 2) Sources & Governance
 
-* [ ] Add `configs/sources.yaml` with allow-lists:
+* [x] Add `configs/sources.yaml` with allow-lists:
 
   * Snowflake docs, dbt docs, Tableau help.
-* [ ] Note license posture: prefer **excerpts + canonical links** if unclear.
+* [x] Note license posture: prefer **excerpts + canonical links** if unclear.
 * [ ] PII scrubbing rules for internal docs.
 * **Acceptance:** `configs/sources.yaml` exists; ingestion respects allow-list.
 
@@ -62,11 +62,11 @@ notes:
 
 **Directory:** `ingestion/`
 
-* [ ] `01_collect.py` — crawl sitemaps/APIs, save raw HTML/MD; throttle; resolve redirects.
-* [ ] `02_clean.py` — HTML→Markdown; keep titles, H1–H4, code fences, tables.
-* [ ] `03_chunk.py` — heading-aware chunks (\~1k tokens) with 10–15% overlap; preserve code fences.
-* [ ] `04_embed.py` — create embeddings (e.g., `intfloat/e5-large-v2` or `BAAI/bge-large-en`).
-* [ ] `05_index.py` — upsert chunks to vector store and lexical index; track version and `updated_at`.
+* [x] `01_collect.py` — crawl sitemaps/APIs, save raw HTML/MD; throttle; resolve redirects.
+* [x] `02_clean.py` — HTML→Markdown; keep titles, H1–H4, code fences, tables.
+* [x] `03_chunk.py` — heading-aware chunks (\~1k tokens) with 10–15% overlap; preserve code fences.
+* [x] `04_embed.py` — create embeddings (e.g., `intfloat/e5-large-v2` or `BAAI/bge-large-en`).
+* [x] `05_index.py` — upsert chunks to vector store and lexical index; track version and `updated_at`.
 * **Acceptance:** Running `make ingest` ingests ≥50 docs; duplicates de-duplicated (shingled hash).
 
 **Chunk metadata (store per chunk):**
@@ -93,8 +93,8 @@ notes:
 
 **Default:** Postgres + pgvector in `infra/docker-compose.yml`.
 
-* [ ] Enable `vector` extension and tables.
-* [ ] Create IVFFLAT index for embeddings; GIN/BM25 index for lexical.
+* [x] Enable `vector` extension and tables.
+* [x] Create IVFFLAT index for embeddings; GIN/BM25 index for lexical.
 * **Acceptance:** `SELECT COUNT(*) FROM rag_chunks;` returns > 0; vector/lexical queries both run.
 
 **SQL migration example**
@@ -130,10 +130,10 @@ CREATE INDEX IF NOT EXISTS rag_chunks_lexical_idx
 
 **Directory:** `core/retrieval/`
 
-* [ ] `retriever.py` — hybrid query: BM25 (top 50) + vector (top 50) → union → **rerank** to final top-K.
+* [x] `retriever.py` — hybrid query: BM25 (top 50) + vector (top 50) → union → **rerank** to final top-K.
 * [ ] Add **diversity penalty** per domain (avoid duplicate hits from same URL).
-* [ ] `reranker.py` — local or API (e.g., `BAAI/bge-reranker-v2-m3`).
-* [ ] Config in `configs/retrieval.yaml`.
+* [x] `reranker.py` — local or API (e.g., `BAAI/bge-reranker-v2-m3`).
+* [x] Config in `configs/retrieval.yaml`.
 * **Acceptance:** `top_k=12`, `rerank_k=5` returns relevant, diverse chunks in logs.
 
 ```yaml
@@ -154,7 +154,7 @@ low_conf_threshold: 0.52
 
 * [ ] Add a **system prompt** for “Senior Architect: Snowflake/dbt/Tableau; cite sources; version-aware.”
 * [ ] Response structure: **short answer → steps/code → alternatives/trade-offs → pitfalls → sources**.
-* [ ] Extend `POST /api/chat/stream` to accept:
+* [x] Extend `POST /api/chat/stream` to accept:
 
   ```json
   {
@@ -165,7 +165,7 @@ low_conf_threshold: 0.52
   }
   ```
 * [ ] Always include 3–5 citations with URLs; include version label when known.
-* [ ] **Low confidence**: ask 1 clarifying question OR show 2–3 likely options with sources.
+* [x] **Low confidence**: ask 1 clarifying question OR show 2–3 likely options with sources.
 * **Acceptance:** Answers stream with citations; logs show retrieved chunk IDs and rerank scores.
 
 ---
@@ -174,7 +174,7 @@ low_conf_threshold: 0.52
 
 **Directory:** `backend/tools/`
 
-* [ ] Use existing `tools/sql_tools.py` for SQL format/lint in answers.
+* [x] Use existing `tools/sql_tools.py` for SQL format/lint in answers.
 * [ ] (Later) `dbt_runner.py` for deps/tests/dry-run summaries (guarded; no destructive ops).
 * [ ] (Later) `tableau_calc_lint.py` for calc/perf hints.
 * [ ] (Later) `snowflake_explain.py` to parse query plans (pruning/caching hints).
@@ -186,16 +186,16 @@ low_conf_threshold: 0.52
 
 **Directory:** `frontend/`
 
-* [ ] Chat UI: show **citations** panel (title + domain + link); hover previews.
-* [ ] Toggle “Use RAG” in chat input (persist in conversation settings).
-* [ ] Visual cue for **low confidence** (ask-clarify card).
+* [x] Chat UI: show **citations** panel (title + domain + link); hover previews.
+* [x] Toggle “Use RAG” in chat input (persist in conversation settings).
+* [x] Visual cue for **low confidence** (ask-clarify card).
 * **Acceptance:** Users can open sources from messages; RAG toggle state persists.
 
 ---
 
 ## 9) Configuration & Env Vars
 
-* [ ] `.env.example` additions:
+* [x] `.env.example` additions:
 
   ```
   EMBEDDING_MODEL_ID=intfloat/e5-large-v2
@@ -209,8 +209,8 @@ low_conf_threshold: 0.52
 
 ## 10) Docker & Make Targets
 
-* [ ] Compose: ensure Postgres is initialized with `vector` extension (init script or migration container).
-* [ ] Add Make targets:
+* [x] Compose: ensure Postgres is initialized with `vector` extension (init script or migration container).
+* [x] Add Make targets:
 
   * `make ingest` (run 01→05)
   * `make reindex` (changed docs only)
@@ -245,21 +245,21 @@ low_conf_threshold: 0.52
 
 ### Phase 0 — Foundation (1–2 days)
 
-* [ ] Dirs + configs + Makefile stubs
-* [ ] pgvector migration ready
+* [x] Dirs + configs + Makefile stubs
+* [x] pgvector migration ready
 * **DOD:** `make ingest` runs with sample sources; chunk count > 0.
 
 ### Phase 1 — Retrieval + Citations (2–4 days)
 
-* [ ] Hybrid retriever + reranker
-* [ ] `/api/chat/stream` supports `use_rag`
-* [ ] Frontend shows citations
+* [x] Hybrid retriever + reranker
+* [x] `/api/chat/stream` supports `use_rag`
+* [x] Frontend shows citations
 * **DOD:** 3–5 citations per answer; relevance spot-checks pass.
 
 ### Phase 2 — Tools + Low-Confidence (2–3 days)
 
-* [ ] SQL formatter integrated
-* [ ] Low-confidence branch (clarify or options)
+* [x] SQL formatter integrated
+* [x] Low-confidence branch (clarify or options)
 * **DOD:** Logs show low-confidence path; UX tested.
 
 ### Phase 3 — Eval Harness + Guardrails (3–5 days)

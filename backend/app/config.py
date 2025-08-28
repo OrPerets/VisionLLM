@@ -61,6 +61,11 @@ class Settings(BaseSettings):
 		protected_namespaces=(),
 	)
 
+	# RAG defaults
+	rag_enabled: bool = Field(True, env="RAG_ENABLED")
+	embedding_model_id: str = Field("intfloat/e5-large-v2", env="EMBEDDING_MODEL_ID")
+	reranker_model_id: str = Field("BAAI/bge-reranker-v2-m3", env="RERANKER_MODEL_ID")
+
 
 @lru_cache()
 

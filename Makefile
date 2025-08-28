@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down logs seed migrate backend-dev
+.PHONY: dev-up dev-down logs seed migrate backend-dev ingest reindex eval ingest-one ingest-docs
 
 dev-up:
 	docker compose -f infra/docker-compose.yml up -d --build
@@ -17,5 +17,22 @@ migrate:
 
 seed:
 	$(MAKE) -C backend seed
+
+ingest:
+	python3 -m ingestion.01_collect --sources configs/sources.yaml --out .cache --product all
+
+ingest-one:
+	python3 -m ingestion.01_collect --sources configs/sources.yaml --out .cache --product $(PRODUCT) --max-urls $(MAX) --resume
+
+ingest-docs:
+	@echo "Deprecated. Use 'make ingest' or 'make ingest-one' instead."
+
+reindex:
+	python3 ingestion/03_chunk.py && \
+	python3 ingestion/04_embed.py && \
+	python3 ingestion/05_index.py
+
+eval:
+	echo "Eval harness to be implemented in Phase 3"
 
 

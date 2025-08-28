@@ -1,0 +1,1 @@
+{"collected_at": "2025-08-28T05:52:42.225211+00:00", "url": "https://docs.getdbt.com/docs/building-a-dbt-project/models", "title": "dbt Models", "product": "dbt", "version": null, "content": "# dbt Models\n\nModels are select statements materialized as tables or views..."}

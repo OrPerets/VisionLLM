@@ -1,4 +1,4 @@
-import {
+import { 
   ProjectRead,
   ConversationRead,
   MessageRead,
@@ -19,6 +19,15 @@ import {
   ProjectMemberRead,
   ProjectMemberCreateRequest,
   ProjectMemberUpdateRequest,
+  ModelsResponse,
+  LLMProviderRead,
+  LLMProviderCreate,
+  LLMProviderUpdate,
+  Agent,
+  AgentRecommendRequest,
+  AgentRecommendation,
+  AgentCreate,
+  AgentUpdate,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api";
@@ -48,6 +57,50 @@ export async function getHealth(): Promise<Health> {
 
 export async function getMeta(): Promise<Meta> {
   return fetchJson<Meta>(`${API_BASE}/meta`);
+}
+
+// Models admin
+export async function getModels(): Promise<ModelsResponse> {
+  // Use public models endpoint so chat UI can access even if not admin
+  return fetchJson<ModelsResponse>(`${API_BASE}/models`);
+}
+
+export async function pullModel(name: string): Promise<{ ok: boolean; status: string; name?: string }> {
+  return fetchJson<{ ok: boolean; status: string; name?: string }>(`${API_BASE}/admin/models/pull`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteModel(name: string): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`${API_BASE}/admin/models/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+  });
+}
+
+// LLM Providers (admin)
+export async function listLLMProviders(): Promise<LLMProviderRead[]> {
+  return fetchJson<LLMProviderRead[]>(`${API_BASE}/admin/llm/providers`);
+}
+
+export async function createLLMProvider(data: LLMProviderCreate): Promise<LLMProviderRead> {
+  return fetchJson<LLMProviderRead>(`${API_BASE}/admin/llm/providers`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateLLMProvider(id: number, data: LLMProviderUpdate): Promise<LLMProviderRead> {
+  return fetchJson<LLMProviderRead>(`${API_BASE}/admin/llm/providers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteLLMProvider(id: number): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`${API_BASE}/admin/llm/providers/${id}`, {
+    method: "DELETE",
+  });
 }
 
 // Project endpoints
@@ -202,6 +255,55 @@ export async function searchAll(q: string): Promise<SearchResponse> {
   const url = new URL(`${API_BASE}/projects/search`);
   url.searchParams.set("q", q);
   return fetchJson<SearchResponse>(url.toString());
+}
+
+// Agents (public)
+export async function listAgents(params: { q?: string; product?: string; category?: string; tag?: string; limit?: number } = {}): Promise<Agent[]> {
+  const url = new URL(`${API_BASE}/agents`);
+  if (params.q) url.searchParams.set("q", params.q);
+  if (params.product) url.searchParams.set("product", params.product);
+  if (params.category) url.searchParams.set("category", params.category);
+  if (params.tag) url.searchParams.set("tag", params.tag);
+  if (params.limit) url.searchParams.set("limit", String(params.limit));
+  return fetchJson<Agent[]>(url.toString());
+}
+
+export async function getAgent(agentId: number): Promise<Agent> {
+  return fetchJson<Agent>(`${API_BASE}/agents/${agentId}`);
+}
+
+export async function recommendAgents(data: AgentRecommendRequest): Promise<AgentRecommendation[]> {
+  return fetchJson<AgentRecommendation[]>(`${API_BASE}/agents/recommend`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// Admin: Agents
+export async function adminListAgents(q?: string): Promise<Agent[]> {
+  const url = new URL(`${API_BASE}/admin/agents`);
+  if (q) url.searchParams.set("q", q);
+  return fetchJson<Agent[]>(url.toString());
+}
+
+export async function adminCreateAgent(data: AgentCreate): Promise<Agent> {
+  return fetchJson<Agent>(`${API_BASE}/admin/agents`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminUpdateAgent(agentId: number, data: AgentUpdate): Promise<Agent> {
+  return fetchJson<Agent>(`${API_BASE}/admin/agents/${agentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminDeleteAgent(agentId: number): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`${API_BASE}/admin/agents/${agentId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function listUsers(q?: string): Promise<UserRead[]> {

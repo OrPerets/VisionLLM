@@ -108,6 +108,11 @@ class ChatStreamRequest(BaseModel):
     max_tokens: Optional[int] = None
     system_override: Optional[str] = None
     history_strategy: Optional[str] = Field(default="recent", description="recent|window token-bounded history")
+    use_rag: Optional[bool] = Field(default=False, description="Enable Retrieval-Augmented Generation")
+    top_k: Optional[int] = Field(default=12)
+    low_conf_threshold: Optional[float] = Field(default=0.52)
+    model_id: Optional[str] = Field(default=None, description="Optional model override for this request")
+    agent_id: Optional[int] = Field(default=None, description="Optional agent selection for this request")
 
 
 class SQLTranspileRequest(BaseModel):
@@ -149,4 +154,121 @@ class UserRoleUpdate(BaseModel):
 class SearchResponse(BaseModel):
     projects: list["ProjectRead"]
     conversations: list["ConversationRead"]
+
+
+# Models/admin
+class ModelInfo(BaseModel):
+    name: str
+    size_bytes: Optional[int] = None
+    parameter_size: Optional[str] = None
+    quantization: Optional[str] = None
+    format: Optional[str] = None
+    source: Optional[str] = None  # ollama | tgi | gguf | provider
+    provider: Optional[str] = None  # openai | google | ...
+
+
+class ModelsResponse(BaseModel):
+    backend: str
+    models: list[ModelInfo]
+    default_model_id: Optional[str] = None
+    current_ollama_model: Optional[str] = None
+    providers: Optional[list[str]] = None
+
+
+# Admin: LLM Providers
+class LLMProviderCreate(BaseModel):
+    provider: str
+    name: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    organization: Optional[str] = None
+    project: Optional[str] = None
+    config: Optional[dict[str, Any]] = None
+    enabled: Optional[bool] = True
+
+
+class LLMProviderRead(BaseModel):
+    id: int
+    provider: str
+    name: Optional[str]
+    base_url: Optional[str]
+    organization: Optional[str]
+    project: Optional[str]
+    config: Optional[dict[str, Any]]
+    enabled: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LLMProviderUpdate(BaseModel):
+    name: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    organization: Optional[str] = None
+    project: Optional[str] = None
+    config: Optional[dict[str, Any]] = None
+    enabled: Optional[bool] = None
+
+
+class PullModelRequest(BaseModel):
+    name: str
+
+
+class PullModelResponse(BaseModel):
+    ok: bool
+    status: str
+    name: Optional[str] = None
+
+
+class DeleteModelResponse(BaseModel):
+    ok: bool
+
+
+# Agents
+class AgentBase(BaseModel):
+    name: str
+    product: str
+    description: Optional[str] = None
+    categories: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
+    system_instructions: str
+    knowledge_urls: Optional[list[str]] = None
+    defaults: Optional[dict] = None
+    is_enabled: Optional[bool] = True
+
+
+class AgentCreate(AgentBase):
+    pass
+
+
+class AgentUpdate(BaseModel):
+    name: Optional[str] = None
+    product: Optional[str] = None
+    description: Optional[str] = None
+    categories: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
+    system_instructions: Optional[str] = None
+    knowledge_urls: Optional[list[str]] = None
+    defaults: Optional[dict] = None
+    is_enabled: Optional[bool] = None
+
+
+class AgentRead(AgentBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AgentRecommendRequest(BaseModel):
+    q: str
+    product: Optional[str] = None
+    categories: Optional[list[str]] = None
+    top_k: Optional[int] = 10
+
+
+class AgentRecommendation(BaseModel):
+    agent: AgentRead
+    score: float
+    reason: str
 

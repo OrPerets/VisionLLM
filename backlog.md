@@ -247,3 +247,85 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
 - Admin console: projects table, recent activity view, and export transcripts.
 - Add rate limiting middleware and friendly errors.
 - Documentation polish and seed improvements.
+
+---
+
+## Epic: Agents (Snowflake/dbt/Tableau) — selection and recommendation
+
+Goal: Add an Agent entity with metadata and system instructions; enable users to discover and select agents, and apply agent defaults/instructions within chat.
+
+Status
+- [x] Data model added (`Agent` in `backend/app/models.py`)
+- [x] Schemas: `Agent*` models + `ChatStreamRequest.agent_id`
+- [x] Migration 0003 for `agents` table and indexes
+- [x] Public Agents router: list/get/recommend
+- [x] Admin CRUD endpoints
+- [x] Chat flow applies agent system instructions/defaults and stores meta
+- [x] Seed sample agents
+- [x] Frontend types and API helpers
+- [x] Composer UI: agent picker, recommendations, selection badge
+- [ ] README docs
+
+Scope & acceptance criteria
+- Backend
+  - [x] Alembic migration creates `agents` with unique `(name, product)` and `idx_agents_product`.
+  - [x] GET `/api/agents` filters: `q`, `product`, `category`, `tag`; returns enabled agents.
+  - [x] GET `/api/agents/{id}` returns `AgentRead` or 404.
+  - [x] POST `/api/agents/recommend` returns ranked `AgentRecommendation[]` with `reason`.
+  - [x] Admin CRUD under `/api/admin/agents` (POST, PATCH, DELETE) with admin guard.
+  - [x] Chat `/api/chat/stream` accepts `agent_id`; loads enabled agent; applies `system_instructions`; fills unset temperature/max_tokens/model_id from `agent.defaults_json`; appends `meta.agent` and persists in assistant `meta_json`.
+  - [x] Tests cover list/filter, recommend scoring/sorting, and chat meta persistence.
+- Frontend
+  - [x] Types: `Agent`, `AgentRecommendRequest`, `AgentRecommendation`; extend chat request with `agent_id?`.
+  - [x] API helpers: `listAgents`, `getAgent`, `recommendAgents`.
+  - [x] Chat composer: local state (`selectedAgentId`, `agentSearch`, `recommendedAgents`); combobox near model selector; recommend on type; selection sets `selectedAgentId`; include in `streamChat` payload; render info line/badge.
+  - [x] No regression in streaming.
+- Docs/seed
+  - [ ] Seed sample agents for Snowflake/dbt/Tableau with categories/tags and strong `system_instructions`.
+  - [ ] README section explains Agents and recommendation behavior.
+
+Technical tasks
+1) Database
+   - [ ] Create Alembic migration `0003_agents.py` to add table and indexes.
+
+2) Backend API
+   - [x] New router `backend/app/routers/agents.py`:
+       - [x] GET `/agents` with filters and case-insensitive search across `name`, `description`, `categories_json`, `tags_json`.
+       - [x] GET `/agents/{agent_id}`.
+       - [x] POST `/agents/recommend` with term-overlap scoring + product boost; return top_k.
+   - [x] Wire router in `backend/app/main.py`.
+   - [x] Extend `backend/app/routers/admin.py` with:
+       - [x] POST `/admin/agents` (AgentCreate)
+       - [x] PATCH `/admin/agents/{id}` (AgentUpdate)
+       - [x] DELETE `/admin/agents/{id}`
+   - [x] Modify `backend/app/routers/chat.py` to accept/apply `agent_id` and defaults and to include `meta.agent`.
+
+3) Seeding
+   - [x] Update `backend/scripts/seed.py` to insert sample agents if none exist.
+
+4) Frontend
+   - [x] Update `frontend/lib/types.ts` and `frontend/lib/api.ts`.
+   - [x] Update `frontend/components/chat/chat-composer.tsx` to add the agent picker and send `agent_id`.
+
+5) Docs/QA
+   - [ ] Add README section with overview and curl examples.
+   - [ ] Manual acceptance checklist for backend/frontend.
+
+Recommendation scoring (MVP)
+- Tokenize/normalize `q` (lowercase, alphanumerics).
+- Compute term overlap against `name + description + categories + tags`.
+- Base score = overlap_count / max(6, len(q_terms)); clamp to [0, 1].
+- Product boost (+0.1) if request.product matches agent.product.
+- Reason string enumerates matched tags/categories and product boost.
+- Sort desc by score; return top_k.
+
+Risks/considerations
+- SQLite JSON querying: use LIKE on serialized JSON or portable helpers.
+- Keep defaults application non-destructive to explicit user overrides.
+- Future: swap scoring to TF-IDF/embeddings for better relevance.
+
+Rollout plan
+- Land migration + routers + chat flow.
+- Seed agents.
+- Ship frontend types/API and agent picker UI.
+- Add docs and perform acceptance.

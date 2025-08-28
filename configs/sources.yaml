@@ -1,0 +1,54 @@
+domains:
+  - product: snowflake
+    allow:
+      - https://docs.snowflake.com/en/*
+    deny: []
+    version_label: "2025.08"
+    rate_limit_rps: 1.0
+    sitemap_urls:
+      - https://docs.snowflake.com/sitemap.xml
+    manual_urls_file: ingestion/urls_manual/snowflake.txt
+
+  - product: dbt
+    allow:
+      - https://docs.getdbt.com/docs/*
+      - https://docs.getdbt.com/reference/*
+    deny: []
+    version_label: "dbt-core-1.8"
+    rate_limit_rps: 1.0
+    sitemap_urls:
+      - https://docs.getdbt.com/sitemap.xml
+    manual_urls_file: ingestion/urls_manual/dbt.txt
+
+  - product: tableau
+    allow:
+      - https://help.tableau.com/current/*/en-us/*
+    deny: []
+    version_label: "2024.3"
+    rate_limit_rps: 0.8
+    sitemap_urls:
+      - https://help.tableau.com/sitemap.xml
+    manual_urls_file: ingestion/urls_manual/tableau.txt
+
+notes:
+  - "Prefer excerpts + canonical links if license unclear."
+
+domains:
+  - product: snowflake
+    allow:
+      - https://docs.snowflake.com/en/*
+    version_label: "2025.08"
+    rate_limit_rps: 1.0
+  - product: dbt
+    allow:
+      - https://docs.getdbt.com/docs/*
+      - https://docs.getdbt.com/reference/*
+    rate_limit_rps: 1.0
+  - product: tableau
+    allow:
+      - https://help.tableau.com/current/*/en-us/*
+    rate_limit_rps: 1.0
+notes:
+  - Prefer excerpts + links if license unclear.
+
+
