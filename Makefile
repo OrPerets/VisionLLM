@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down logs seed migrate backend-dev ingest reindex eval ingest-one ingest-docs
+.PHONY: dev-up dev-down logs seed migrate backend-dev ingest reindex eval ingest-one ingest-docs docker-build docker-push docker-build-multi
 
 dev-up:
 	docker compose -f infra/docker-compose.yml up -d --build
@@ -34,5 +34,17 @@ reindex:
 
 eval:
 	echo "Eval harness to be implemented in Phase 3"
+
+docker-build:
+	docker buildx build --platform linux/amd64 -t orperetz/vision-llm:latest -f backend/Dockerfile .
+	docker buildx build --platform linux/amd64 -t orperetz/vision-llm-frontend:latest -f frontend/Dockerfile frontend
+
+docker-build-multi:
+	docker buildx build --platform linux/amd64,linux/arm64 -t orperetz/vision-llm:latest -f backend/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 -t orperetz/vision-llm-frontend:latest -f frontend/Dockerfile frontend
+
+docker-push: docker-build
+	docker push orperetz/vision-llm:latest
+	docker push orperetz/vision-llm-frontend:latest
 
 

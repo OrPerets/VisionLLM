@@ -21,8 +21,9 @@ import {
   Zap,
   Hash,
   Check,
+  Sparkles,
 } from "lucide-react";
-import { formatTimestamp, formatElapsedTime, formatTokensPerSecond, formatTokenCount, copyToClipboard } from "@/lib/utils";
+import { formatTimestamp, formatElapsedTime, formatTokensPerSecond, formatTokenCount, copyToClipboard, cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface MessageItemProps {
@@ -431,9 +432,17 @@ export function MessageItem({ message, isLatest, isGrouped = false, showAvatar =
 
   return (
     <motion.div 
-      className={`group relative transition-all duration-200 ${
-        isLatest ? "bg-muted/20" : ""
-      } ${!isGrouped ? "py-6 px-6" : "py-3 px-6"} hover:bg-muted/40`}
+      className={cn(
+        "group relative transition-all duration-200 px-6",
+        !isGrouped ? "py-6" : "py-3",
+        // ChatGPT-style alternating background based on role
+        isUser 
+          ? "" // User messages on default background
+          : isAssistant 
+            ? "bg-muted/30" // Assistant messages on light background
+            : "bg-accent/10", // System messages on accent background
+        "hover:bg-opacity-60"
+      )}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ 
@@ -443,60 +452,84 @@ export function MessageItem({ message, isLatest, isGrouped = false, showAvatar =
       }}
     >
       <div className="flex gap-4 items-start">
-        {/* Avatar Column - Always present for consistent alignment */}
+        {/* Avatar Column - Consistent positioning */}
         <div className="flex-shrink-0 w-8 flex justify-center">
-          {!isGrouped ? renderRole() : null}
+          {!isGrouped ? renderRole() : <div className="w-8 h-8" />}
         </div>
         
-        {/* Content Column - Better width management */}
-        <div className="flex-1 space-y-3 overflow-hidden">
+        {/* Content Column */}
+        <div className="flex-1 space-y-3 overflow-hidden min-w-0">
           {renderContent()}
           {renderMetadata()}
         </div>
 
-        {/* Action Column - Fixed width to prevent shifting */}
-        <div className="flex-shrink-0 w-10 flex justify-end">
-          <motion.div
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopy}
-                  className="h-8 w-8 p-0 hover:bg-background/60 rounded-md chat-hover"
-                >
-                  <AnimatePresence mode="wait">
-                    {copied ? (
-                      <motion.div
-                        key="check"
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        exit={{ scale: 0, rotate: 180 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <Check className="h-3.5 w-3.5 text-emerald-600" />
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="copy"
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        exit={{ scale: 0, rotate: 180 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{copied ? "Copied!" : "Copy message"}</TooltipContent>
-            </Tooltip>
-          </motion.div>
+        {/* Action Column - ChatGPT style hover actions */}
+        <div className="flex-shrink-0 w-12 flex justify-end">
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
+            {/* Copy Button */}
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCopy}
+                    className="h-8 w-8 hover:bg-background/60 rounded-md"
+                  >
+                    <AnimatePresence mode="wait">
+                      {copied ? (
+                        <motion.div
+                          key="check"
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          exit={{ scale: 0, rotate: 180 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="copy"
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          exit={{ scale: 0, rotate: 180 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{copied ? "Copied!" : "Copy message"}</TooltipContent>
+              </Tooltip>
+            </motion.div>
+            
+            {/* Additional actions for assistant messages */}
+            {isAssistant && (
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toast.info("Regenerate coming soon")}
+                      className="h-8 w-8 hover:bg-background/60 rounded-md"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Regenerate response</TooltipContent>
+                </Tooltip>
+              </motion.div>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

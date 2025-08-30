@@ -100,7 +100,8 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
     citations: list[dict] = []
     confidence_score: float | None = None
     low_confidence: bool = False
-    if request.use_rag:
+    effective_use_rag = request.use_rag if request.use_rag is not None else (agent_defaults.get("use_rag") if agent_defaults else project_defaults.get("use_rag"))
+    if effective_use_rag:
         try:
             import os
             import sys
@@ -188,10 +189,18 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
     generator = None
     provider_name: str | None = None
     provider_model: str | None = None
+    
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Model selection - model_id: {model_id}, backend: {backend}")
+    
     if model_id and ":" in model_id:
         provider_name, provider_model = model_id.split(":", 1)
         provider_name = (provider_name or "").strip().lower()
         provider_model = (provider_model or "").strip()
+        logger.info(f"Provider parsing - provider_name: {provider_name}, provider_model: {provider_model}")
+        
         # Look up provider credentials (case-insensitive)
         try:
             from sqlalchemy import func
@@ -200,6 +209,8 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
                 .filter(func.lower(models.LLMProvider.provider) == provider_name, models.LLMProvider.enabled == 1)
                 .first()
             )
+            logger.info(f"Provider lookup - found: {provider_row is not None}, provider: {provider_row.provider if provider_row else None}")
+            
             if provider_row and provider_row.api_key:
                 backend = provider_name
                 generator = stream_generate_with_provider(
@@ -214,10 +225,27 @@ async def event_stream(request: ChatStreamRequest, http_request: Request, db: Se
                     max_new_tokens=max_tokens,
                     stop=None,
                 )
-        except Exception:
+        except Exception as e:
+            logger.error(f"Provider setup error: {e}")
             generator = None
 
     if generator is None:
+        # Check if we have enabled providers but the model_id doesn't use provider format
+        if not model_id or ":" not in model_id:
+            try:
+                from sqlalchemy import func
+                enabled_providers = db.query(models.LLMProvider).filter(models.LLMProvider.enabled == 1).all()
+                if enabled_providers:
+                    provider_names = [p.provider for p in enabled_providers]
+                    logger.warning(f"Enabled providers found ({provider_names}) but model_id '{model_id}' doesn't use provider:model format. Using default backend '{backend}' instead.")
+                    
+                    # Return a helpful error message to the user
+                    error_message = f"To use the configured providers ({', '.join(provider_names)}), please select a model with the format 'provider:model' (e.g., 'openai:gpt-4o-mini'). Currently using default backend '{backend}' with model '{model_id}'."
+                    yield f"event: error\ndata: {json.dumps({'error': error_message})}\n\n"
+                    return
+            except Exception:
+                pass
+        
         generator = (
             ollama_client.stream_generate(
                 prompt,

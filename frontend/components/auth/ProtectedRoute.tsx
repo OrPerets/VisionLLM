@@ -20,7 +20,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthChecked, checkAuth, isAuthenticated } = useAppStore();
+  const { user, isAuthChecked, checkAuth, isAuthenticated, authEnabled } = useAppStore();
 
   useEffect(() => {
     // Initialize auth check if not done
@@ -34,6 +34,11 @@ export function ProtectedRoute({
       if (isAuthenticated()) {
         router.replace("/");
       }
+      return;
+    }
+
+    // If auth is disabled, allow all routes (except admin routes)
+    if (!authEnabled && !adminOnly) {
       return;
     }
 
@@ -67,6 +72,21 @@ export function ProtectedRoute({
   // Redirect states - show nothing while redirecting
   if (pathname === "/login" && isAuthenticated()) {
     return <AuthLoadingState />;
+  }
+
+  // If auth is disabled, allow all routes (except admin routes)
+  if (!authEnabled && !adminOnly) {
+    return (
+      <motion.div
+        variants={motionVariants.pageEnter}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="h-full"
+      >
+        {children}
+      </motion.div>
+    );
   }
 
   if (requireAuth && !isAuthenticated()) {

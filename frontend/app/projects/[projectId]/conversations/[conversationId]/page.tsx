@@ -31,10 +31,12 @@ export default function ChatPage() {
   }, [conversationId, selectedConversationId, selectConversation]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-hidden">
+    <div className="h-full relative">
+      {/* Chat Window with bottom padding for sticky composer */}
+      <div className="h-full pb-32 overflow-hidden">
         <ChatWindow />
       </div>
+      {/* Sticky Composer - now rendered globally */}
       <ChatComposer />
     </div>
   );

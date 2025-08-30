@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIClient:
@@ -55,9 +58,16 @@ class OpenAIClient:
             "stop": stop or [],
             "stream": False,
         }
+        
+        # Debug logging
+        logger.info(f"OpenAI request - URL: {url}, Model: {model}, Temperature: {temperature}, Max tokens: {max_new_tokens}")
+        logger.info(f"OpenAI request payload: {json.dumps(payload, indent=2)}")
+        
         async with httpx.AsyncClient(timeout=None) as client:
             r = await client.post(url, headers=headers, json=payload)
-            r.raise_for_status()
+            if not r.is_success:
+                logger.error(f"OpenAI API error - Status: {r.status_code}, Response: {r.text}")
+                r.raise_for_status()
             data = r.json() or {}
             text = (((data.get("choices") or [{}])[0].get("message") or {}).get("content")) or ""
             if text:

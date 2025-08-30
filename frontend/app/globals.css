@@ -286,6 +286,20 @@
   word-wrap: break-word;
   overflow-wrap: break-word;
   hyphens: auto;
+  line-height: 1.6;
+}
+
+/* ChatGPT-style message alternating backgrounds */
+.message-user {
+  background: transparent;
+}
+
+.message-assistant {
+  background: hsl(var(--muted) / 0.3);
+}
+
+.message-system {
+  background: hsl(var(--accent) / 0.1);
 }
 
 .chat-message pre {
@@ -332,6 +346,13 @@
 .chat-input:focus-within {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 0 0 1px hsl(var(--primary) / 0.2);
+}
+
+/* ChatGPT-style composer */
+.composer-sticky {
+  backdrop-filter: blur(8px);
+  background: hsl(var(--background) / 0.95);
+  border-top: 1px solid hsl(var(--border) / 0.5);
 }
 
 /* Improved hover states */

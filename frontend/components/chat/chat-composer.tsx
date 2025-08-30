@@ -11,8 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { streamChat } from "@/lib/stream";
 import { Send, Square, Settings2, Thermometer, Hash, Loader2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getModels, listAgents, recommendAgents } from "@/lib/api";
+import { getModels, listAgents, recommendAgents, API_BASE } from "@/lib/api";
+import type { Agent } from "@/lib/types";
 import { toast } from "sonner";
 
 interface ChatComposerProps {
@@ -41,10 +43,30 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
   const [providers, setProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | undefined>(undefined);
-  const [agents, setAgents] = useState<{ id: number; name: string; product: string }[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<number | undefined>(undefined);
   const [agentSearch, setAgentSearch] = useState("");
   const [isSearchingAgents, setIsSearchingAgents] = useState(false);
+  
+  // Curated OpenAI models for selection
+  const OPENAI_MODELS = [
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "gpt-4.1",
+    "gpt-4o-mini",
+    "gpt-4o",
+    "gpt-4-turbo",
+    "gpt-3.5-turbo",
+  ];
+  
+  const labelForProvider = useCallback((key: string) => {
+    const k = (key || "").toLowerCase();
+    if (k === "local") return "Localhost";
+    if (k === "openai") return "OpenAI";
+    if (k === "google") return "Google";
+    return key?.charAt(0).toUpperCase() + key?.slice(1);
+  }, []);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -71,17 +93,43 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
         const info = await getModels();
         const list = (info.models || []).map((m) => ({ name: m.name, provider: (m as any).provider || (m as any).format || null }));
         setModels(list);
-        const providersFromApi = (info.providers || []).map((p) => p);
-        if (providersFromApi.length > 0) {
-          setProviders(providersFromApi);
-        } else {
-          // Derive providers from model name prefixes like "openai:gpt-4o"
+
+        // Determine if local models are available (ollama/gguf)
+        const hasLocal = list.some((m) => {
+          const p = (m.provider || "").toLowerCase();
+          return p === "ollama" || p === "gguf";
+        });
+
+        // Providers from backend (admin-defined)
+        let providersFromApi = Array.from(new Set((info.providers || []).map((p) => (p || "").toLowerCase())));
+        // Defensive fallback: when public models endpoint returns none but admin configured providers exist
+        if (providersFromApi.length === 0) {
+          try {
+            const adminProviders = await (await fetch(`${API_BASE}/admin/llm/providers`, { credentials: "include"})).json();
+            if (Array.isArray(adminProviders)) {
+              providersFromApi = Array.from(new Set(adminProviders.filter((p: any) => p?.enabled).map((p: any) => String(p.provider || "").toLowerCase())));
+            }
+          } catch (err) {
+            // ignore
+          }
+        }
+
+        // Compose provider list: include Localhost when local models exist
+        const combined = new Set<string>();
+        if (hasLocal) combined.add("local");
+        providersFromApi.forEach((p) => combined.add(p));
+
+        // Fallbacks if backend returned nothing and no local
+        if (combined.size === 0) {
+          // Try to derive from model name prefixes like "openai:gpt-4o"
           const derived = Array.from(new Set(list
-            .map((m) => (m.name.includes(":") ? m.name.split(":")[0] : null))
+            .map((m) => (m.name.includes(":") ? m.name.split(":")[0].toLowerCase() : null))
             .filter((x): x is string => Boolean(x))
           ));
-          setProviders(derived);
+          derived.forEach((p) => combined.add(p));
         }
+
+        setProviders(Array.from(combined));
       } catch (e) {
         // ignore
       }
@@ -96,12 +144,37 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
         const info = await getModels();
         const list = (info.models || []).map((m) => ({ name: m.name, provider: (m as any).provider || (m as any).format || null }));
         setModels(list);
-        const providersFromApi = (info.providers || []).map((p) => p);
-        const derived = Array.from(new Set(list
-          .map((m) => (m.name.includes(":") ? m.name.split(":")[0] : null))
-          .filter((x): x is string => Boolean(x))
-        ));
-        setProviders(providersFromApi.length > 0 ? providersFromApi : derived);
+
+        const hasLocal = list.some((m) => {
+          const p = (m.provider || "").toLowerCase();
+          return p === "ollama" || p === "gguf";
+        });
+
+        let providersFromApi = Array.from(new Set((info.providers || []).map((p) => (p || "").toLowerCase())));
+        if (providersFromApi.length === 0) {
+          try {
+            const adminProviders = await (await fetch(`${API_BASE}/admin/llm/providers`, { credentials: "include"})).json();
+            if (Array.isArray(adminProviders)) {
+              providersFromApi = Array.from(new Set(adminProviders.filter((p: any) => p?.enabled).map((p: any) => String(p.provider || "").toLowerCase())));
+            }
+          } catch (err) {
+            // ignore
+          }
+        }
+
+        const combined = new Set<string>();
+        if (hasLocal) combined.add("local");
+        providersFromApi.forEach((p) => combined.add(p));
+
+        if (combined.size === 0) {
+          const derived = Array.from(new Set(list
+            .map((m) => (m.name.includes(":") ? m.name.split(":")[0].toLowerCase() : null))
+            .filter((x): x is string => Boolean(x))
+          ));
+          derived.forEach((p) => combined.add(p));
+        }
+
+        setProviders(Array.from(combined));
       } catch (e) {
         // ignore
       }
@@ -112,8 +185,9 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
   useEffect(() => {
     if (!selectedModel) return;
     if (selectedModel.includes(":")) {
-      const prefix = selectedModel.split(":")[0];
-      if (!selectedProvider) setSelectedProvider(prefix);
+      const prefix = selectedModel.split(":")[0].toLowerCase();
+      const mapped = prefix === "ollama" || prefix === "gguf" ? "local" : prefix;
+      if (!selectedProvider || selectedProvider !== mapped) setSelectedProvider(mapped);
     }
   }, [selectedModel, selectedProvider]);
 
@@ -122,7 +196,7 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
     (async () => {
       try {
         const items = await listAgents({ limit: 50 });
-        setAgents(items.map((a) => ({ id: a.id, name: a.name, product: a.product })));
+        setAgents(items);
       } catch (e) {
         // ignore
       }
@@ -139,7 +213,7 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
       try {
         const recs = await recommendAgents({ q, top_k: 8 });
         if (!cancelled) {
-          setAgents(recs.map((r) => ({ id: r.agent.id, name: r.agent.name, product: r.agent.product })));
+          setAgents(recs.map((r) => r.agent));
         }
       } catch (e) {
         // ignore
@@ -151,6 +225,16 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
       cancelled = true;
     };
   }, [agentSearch]);
+
+  // When agent selection changes, apply its defaults to UI controls
+  useEffect(() => {
+    if (!selectedAgent) return;
+    const d = selectedAgent.defaults || {} as any;
+    if (typeof d.temperature === "number") setTemperature([Number(d.temperature)]);
+    if (typeof d.max_tokens === "number") setMaxTokens([Number(d.max_tokens)]);
+    if (typeof d.model_id === "string" && d.model_id) setSelectedModel(String(d.model_id));
+    if (typeof d.use_rag === "boolean") setUseRag(Boolean(d.use_rag));
+  }, [selectedAgentId]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -273,383 +357,372 @@ export function ChatComposer({ onSend }: ChatComposerProps) {
 
   return (
     <motion.div 
-      className="border-t border-border bg-background/80 backdrop-blur-sm"
+      className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-border/50"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Advanced Settings */}
-      <AnimatePresence>
-        {showAdvanced && (
-          <motion.div 
-            className="border-b border-border bg-muted/30 backdrop-blur-sm"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
-          >
-            <div className="p-5 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <motion.div 
-                  className="space-y-3"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="temp-slider" className="text-sm font-medium flex items-center gap-2">
-                      <Thermometer className="h-4 w-4 text-orange-500" />
-                      Temperature
-                    </Label>
-                    <Badge variant="secondary" className="h-6 px-3 font-mono">
-                      {temperature[0]}
-                    </Badge>
+      {/* Centered Composer Container */}
+      <div className="mx-auto max-w-4xl w-full">
+        {/* Advanced Settings */}
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div 
+              className="border-b border-border/50 bg-muted/30 backdrop-blur-sm"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
+            >
+              <div className="p-4 space-y-4">
+                {/* Conversation Starters (from selected agent) */}
+                {selectedAgent?.starters && selectedAgent.starters.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedAgent.starters.slice(0, 6).map((s, idx) => (
+                      <Button
+                        key={`${idx}-${s}`}
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setMessage(s)}
+                      >
+                        {s}
+                      </Button>
+                    ))}
                   </div>
-                  <Slider
-                    id="temp-slider"
-                    min={0}
-                    max={2}
-                    step={0.1}
-                    value={temperature}
-                    onValueChange={setTemperature}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Controls randomness (0=deterministic, 2=very creative)
-                  </p>
-                </motion.div>
-
-                <motion.div 
-                  className="space-y-3"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.15 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="tokens-slider" className="text-sm font-medium flex items-center gap-2">
-                      <Hash className="h-4 w-4 text-purple-500" />
-                      Max Tokens
-                    </Label>
-                    <Badge variant="secondary" className="h-6 px-3 font-mono">
-                      {maxTokens[0]}
-                    </Badge>
-                  </div>
-                  <Slider
-                    id="tokens-slider"
-                    min={50}
-                    max={4096}
-                    step={50}
-                    value={maxTokens}
-                    onValueChange={setMaxTokens}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Maximum response length (higher=longer responses)
-                  </p>
-                </motion.div>
-
-                <motion.div 
-                  className="space-y-3"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Use RAG</Label>
-                    <Badge variant={useRag ? "default" : "secondary"} className="h-6 px-3">
-                      {useRag ? "On" : "Off"}
-                    </Badge>
-                  </div>
-                  <Button
-                    variant={useRag ? "default" : "secondary"}
-                    onClick={() => setUseRag(!useRag)}
-                    className="w-full"
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <motion.div 
+                    className="space-y-2"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 }}
                   >
-                    {useRag ? "Disable RAG" : "Enable RAG"}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Retrieve docs and cite sources.
-                  </p>
-                </motion.div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="temp-slider" className="text-xs font-medium flex items-center gap-1">
+                        <Thermometer className="h-3 w-3 text-orange-500" />
+                        Temperature
+                      </Label>
+                      <Badge variant="secondary" className="h-5 px-2 font-mono text-xs">
+                        {temperature[0]}
+                      </Badge>
+                    </div>
+                    <Slider
+                      id="temp-slider"
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      value={temperature}
+                      onValueChange={setTemperature}
+                      className="w-full"
+                    />
+                  </motion.div>
 
-      {/* Main Composer */}
-      <div className="p-4 sm:p-5">
-        <motion.div 
-          className="flex gap-3 items-end"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          {/* Message Input Area */}
-          <div className="flex-1 min-w-0">
+                  <motion.div 
+                    className="space-y-2"
+                    initial={{ opacity: 0, x: 0 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.15 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="tokens-slider" className="text-xs font-medium flex items-center gap-1">
+                        <Hash className="h-3 w-3 text-purple-500" />
+                        Max Tokens
+                      </Label>
+                      <Badge variant="secondary" className="h-5 px-2 font-mono text-xs">
+                        {maxTokens[0]}
+                      </Badge>
+                    </div>
+                    <Slider
+                      id="tokens-slider"
+                      min={50}
+                      max={4096}
+                      step={50}
+                      value={maxTokens}
+                      onValueChange={setMaxTokens}
+                      className="w-full"
+                    />
+                  </motion.div>
+
+                  <motion.div 
+                    className="space-y-2"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">Use RAG</Label>
+                      <Badge variant={useRag ? "default" : "secondary"} className="h-5 px-2 text-xs">
+                        {useRag ? "On" : "Off"}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant={useRag ? "default" : "secondary"}
+                      onClick={() => setUseRag(!useRag)}
+                      className="w-full h-8 text-xs"
+                    >
+                      {useRag ? "Disable RAG" : "Enable RAG"}
+                    </Button>
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Composer */}
+        <div className="p-4">
+          {/* Textarea Container */}
+          <motion.div 
+            className="relative mb-3"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+          >
             <motion.div
               className="relative chat-input"
-              whileFocus={{ scale: 1.005 }}
+              whileFocus={{ scale: 1.002 }}
               transition={{ duration: 0.2 }}
             >
               <Textarea
                 ref={textareaRef}
-                placeholder={isStreaming ? "AI is thinking..." : "Type your message here..."}
+                placeholder={isStreaming ? "AI is responding..." : "Message VisionLLM..."}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isStreaming}
-                className={`min-h-[48px] max-h-[200px] resize-none border-2 bg-background/50 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/50 transition-all duration-200 pr-10 ${
-                  isStreaming ? "opacity-75" : ""
-                } text-sm leading-relaxed`}
+                className={cn(
+                  "min-h-[44px] max-h-[160px] resize-none border-2 bg-background",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/50",
+                  "transition-all duration-200 pr-12 text-sm leading-relaxed rounded-xl",
+                  isStreaming && "opacity-75"
+                )}
                 rows={1}
               />
-              {isStreaming && (
-                <motion.div
-                  className="absolute top-3 right-3 z-10"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                >
-                  <div className="bg-background/80 backdrop-blur-sm rounded-full p-1">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  </div>
-                </motion.div>
-              )}
-            </motion.div>
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-            {/* Provider + Model Selector */}
-            <div className="min-w-[140px]">
-              <Select value={selectedProvider} onValueChange={(v) => {
-                setSelectedProvider(v);
-                // Reset model when provider changes
-                setSelectedModel(undefined);
-              }}>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers.length > 0 ? (
-                    providers.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="local">local</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="min-w-[200px]">
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {models
-                    .filter((m) => {
-                      if (!selectedProvider) return true;
-                      const providerPrefix = `${selectedProvider}:`;
-                      return m.name.startsWith(providerPrefix);
-                    })
-                    .map((m) => (
-                      <SelectItem key={m.name} value={m.name}>{m.name}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Agent Picker */}
-            <div className="min-w-[220px]">
-              <div className="relative">
-                <input
-                  value={agentSearch}
-                  onChange={(e) => setAgentSearch(e.target.value)}
-                  placeholder={selectedAgentId ? `Agent: ${agents.find(a=>a.id===selectedAgentId)?.name}` : "Search agents (optional)"}
-                  className="h-12 w-full rounded-md border bg-background/50 px-3 text-sm focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/50"
-                />
-                {isSearchingAgents && (
-                  <div className="absolute right-2 top-3.5 opacity-70">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  </div>
-                )}
-              </div>
-              {agentSearch.trim() && agents.length > 0 && (
-                <div className="mt-1 max-h-48 overflow-auto rounded-md border bg-popover shadow-md">
-                  {agents.map((a) => (
-                    <button
-                      key={a.id}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-muted ${selectedAgentId===a.id ? "bg-muted" : ""}`}
-                      onClick={() => {
-                        setSelectedAgentId(a.id);
-                        setAgentSearch("");
-                        toast.success(`Selected agent: ${a.name}`);
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="truncate">{a.name}</span>
-                        <Badge variant="outline" className="ml-2 capitalize">{a.product}</Badge>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Button
-                variant={showAdvanced ? "secondary" : "ghost"}
-                size="icon"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="h-12 w-12 transition-all duration-200 border border-border/50 hover:border-border chat-hover"
-              >
-                <motion.div
-                  animate={{ rotate: showAdvanced ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Settings2 className="h-4 w-4" />
-                </motion.div>
-              </Button>
-            </motion.div>
-            
-            <AnimatePresence mode="wait">
-              {isStreaming ? (
-                <motion.div
-                  key="stop"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={handleStop}
-                    className="h-12 w-12 shadow-md"
-                  >
-                    <Square className="h-4 w-4" />
-                  </Button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="send"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  whileHover={{ scale: canSend ? 1.02 : 1 }}
-                  whileTap={{ scale: canSend ? 0.98 : 1 }}
-                >
-                  <Button
-                    size="icon"
-                    onClick={handleSend}
-                    disabled={!canSend}
-                    className={`h-12 w-12 transition-all duration-200 chat-hover ${
-                      canSend 
-                        ? "bg-primary hover:bg-primary/90 shadow-lg border-primary/20" 
-                        : "bg-muted border border-border/50"
-                    }`}
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          className="flex flex-col sm:flex-row sm:items-center justify-between mt-4 gap-3 text-xs"
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          {/* Status Message */}
-          <div className="flex items-center gap-2 min-w-0">
-            <AnimatePresence mode="wait">
-              <motion.span
-                key={isStreaming ? "generating" : "ready"}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                className={`flex items-center gap-2 ${isStreaming ? "text-orange-600 font-medium" : "text-muted-foreground"} truncate`}
-              >
-                {isStreaming ? (
-                  <>
+              
+              {/* Send/Stop Button */}
+              <div className="absolute right-2 bottom-2">
+                <AnimatePresence mode="wait">
+                  {isStreaming ? (
                     <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full flex-shrink-0"
-                    />
-                    <span className="truncate">Generating response...</span>
-                  </>
-                ) : (
-                  <span className="hidden sm:inline">Press Enter to send, Shift+Enter for new line</span>
-                )}
-              </motion.span>
-            </AnimatePresence>
-          </div>
-          
-          {/* Controls and Settings */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {selectedAgent && (
-              <motion.div 
-                className="flex items-center gap-1"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-              >
-                <Badge variant="secondary" className="h-6 px-2 truncate max-w-[220px]">
-                  <span className="opacity-70 mr-1">Agent:</span>
-                  <span className="font-medium truncate">{selectedAgent.name}</span>
-                  <span className="ml-1 opacity-60 capitalize">({selectedAgent.product})</span>
-                </Badge>
+                      key="stop"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={handleStop}
+                        className="h-8 w-8 rounded-lg"
+                      >
+                        <Square className="h-3.5 w-3.5" />
+                      </Button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="send"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      whileHover={{ scale: canSend ? 1.05 : 1 }}
+                      whileTap={{ scale: canSend ? 0.95 : 1 }}
+                    >
+                      <Button
+                        size="icon"
+                        onClick={handleSend}
+                        disabled={!canSend}
+                        className={cn(
+                          "h-8 w-8 rounded-lg transition-all duration-200",
+                          canSend 
+                            ? "bg-primary hover:bg-primary/90" 
+                            : "bg-muted text-muted-foreground cursor-not-allowed"
+                        )}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Bottom Controls */}
+          <motion.div 
+            className="flex items-center justify-between text-xs"
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            {/* Left side - Status */}
+            <div className="flex items-center gap-2">
+              {/* Agent Selector */}
+              <Select value={selectedAgentId ? String(selectedAgentId) : undefined} onValueChange={(v) => setSelectedAgentId(v ? parseInt(v) : undefined)}>
+                <SelectTrigger className="h-7 w-40 text-xs border-border/50">
+                  <SelectValue placeholder="Agent" />
+                </SelectTrigger>
+                <SelectContent>
+                  {agents.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)} className="text-xs">
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Clear agent */}
+              {selectedAgentId && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => {
-                    setSelectedAgentId(undefined);
-                    toast.info("Cleared agent selection");
-                  }}
-                  className="h-6 w-6 p-0"
+                  onClick={() => setSelectedAgentId(undefined)}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <AnimatePresence mode="wait">
+                {isStreaming ? (
+                  <motion.div
+                    key="generating"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="flex items-center gap-2 text-orange-600"
+                  >
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      className="w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full"
+                    />
+                    <span className="font-medium">Generating...</span>
+                  </motion.div>
+                ) : (
+                  <motion.span
+                    key="ready"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="text-muted-foreground hidden sm:block"
+                  >
+                    {selectedModel ? `Using ${selectedModel.split(':').pop()}` : "Ready to chat"}
+                    {providers.length > 1 && !selectedModel?.includes(':') && (
+                      <span className="text-orange-600 ml-2">⚠️ Select a provider model</span>
+                    )}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Right side - Controls */}
+            <div className="flex items-center gap-2">
+              {/* Provider Selector */}
+              <Select value={selectedProvider} onValueChange={(v) => {
+                setSelectedProvider(v);
+                if (v === "openai") {
+                  // Try to find an existing OpenAI model first
+                  const existingOpenaiModel = models.find((m) => m.name.startsWith("openai:"));
+                  if (existingOpenaiModel) {
+                    setSelectedModel(existingOpenaiModel.name);
+                  } else {
+                    // Fallback to hardcoded list
+                    const def = OPENAI_MODELS[0] || "gpt-4o-mini";
+                    setSelectedModel(`openai:${def}`);
+                  }
+                } else if (v === "local") {
+                  const localModel = models.find((m) => {
+                    const p = (m.provider || "").toLowerCase();
+                    return p === "ollama" || p === "gguf";
+                  });
+                  setSelectedModel(localModel ? localModel.name : undefined);
+                } else {
+                  const first = models.find((m) => m.name.startsWith(`${v}:`));
+                  setSelectedModel(first ? first.name : undefined);
+                }
+              }}>
+                <SelectTrigger className="h-7 w-16 text-xs border-border/50">
+                  <SelectValue placeholder="Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(providers && providers.length > 0 ? Array.from(new Set(providers)) : ["local"]).map((p) => (
+                    <SelectItem key={p} value={p} className="text-xs">{labelForProvider(p)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Model Selector */}
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="h-7 w-24 text-xs border-border/50">
+                  <SelectValue placeholder="Model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(() => {
+                    // For OpenAI, if no models are returned from backend, use hardcoded list
+                    if (selectedProvider === "openai") {
+                      const openaiModels = models.filter((m) => m.name.startsWith("openai:"));
+                      if (openaiModels.length === 0) {
+                        // Fallback to hardcoded OpenAI models
+                        return OPENAI_MODELS.map((model) => (
+                          <SelectItem key={`openai:${model}`} value={`openai:${model}`} className="text-xs">
+                            {model}
+                          </SelectItem>
+                        ));
+                      }
+                    }
+                    
+                    return models
+                      .filter((m) => {
+                        if (!selectedProvider) return true;
+                        if (selectedProvider === "local") {
+                          const p = (m.provider || "").toLowerCase();
+                          return p === "ollama" || p === "gguf";
+                        }
+                        return m.name.startsWith(`${selectedProvider}:`);
+                      })
+                      .map((m) => (
+                        <SelectItem key={m.name} value={m.name} className="text-xs">
+                          {m.name.includes(":") ? m.name.split(":")[1] : m.name}
+                        </SelectItem>
+                      ));
+                  })()}
+                </SelectContent>
+              </Select>
+
+              {/* Settings Button */}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                >
+                  <motion.div
+                    animate={{ rotate: showAdvanced ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
+                  </motion.div>
                 </Button>
               </motion.div>
-            )}
-            <AnimatePresence>
-              {showAdvanced && (
-                <motion.div
-                  className="flex items-center gap-2"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Badge variant="outline" className="h-6 px-2 font-mono text-xs bg-background/50">
-                    T: {temperature[0]}
-                  </Badge>
-                  <Badge variant="outline" className="h-6 px-2 font-mono text-xs bg-background/50">
-                    Max: {maxTokens[0]}
-                  </Badge>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            
-            <motion.kbd 
-              className="pointer-events-none hidden h-6 select-none items-center gap-1 rounded border bg-muted/60 px-2 font-mono text-[10px] font-medium opacity-100 sm:flex backdrop-blur-sm"
-              whileHover={{ scale: 1.05 }}
-            >
-              <span className="text-xs">⌘</span>↵
-            </motion.kbd>
-          </div>
-        </motion.div>
+
+              {/* Keyboard shortcut hint */}
+              <motion.kbd 
+                className="pointer-events-none hidden h-6 select-none items-center gap-1 rounded border bg-muted/60 px-2 font-mono text-[10px] font-medium opacity-70 sm:flex"
+                whileHover={{ scale: 1.05 }}
+              >
+                <span className="text-xs">⌘</span>↵
+              </motion.kbd>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </motion.div>
   );

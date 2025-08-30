@@ -39,7 +39,7 @@ export default function AdminPage() {
   const [pulling, setPulling] = useState(false);
   const [modelToPull, setModelToPull] = useState("");
   const [providers, setProviders] = useState<any[]>([]);
-  const [newProvider, setNewProvider] = useState<{ provider: string; name?: string; api_key?: string; base_url?: string } | null>({ provider: "openai", name: "OpenAI" });
+  const [newProvider, setNewProvider] = useState<{ provider: string; name?: string; api_key?: string; base_url?: string; models?: string[] } | null>({ provider: "openai", name: "OpenAI" });
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentSearch, setAgentSearch] = useState("");
   const [newAgent, setNewAgent] = useState<AgentCreate>({ name: "", product: "snowflake", system_instructions: "" });
@@ -530,7 +530,7 @@ export default function AdminPage() {
                   {/* Quick add */}
                   <div className="p-3 border rounded-md space-y-2">
                     <div className="font-medium">Add Provider</div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
                       <Select value={newProvider?.provider || "openai"} onValueChange={(v) => setNewProvider({ ...(newProvider || { provider: v }), provider: v })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Provider" />
@@ -543,13 +543,25 @@ export default function AdminPage() {
                       <Input placeholder="Name (optional)" value={newProvider?.name || ""} onChange={(e) => setNewProvider({ ...(newProvider || { provider: "openai" }), name: e.target.value })} />
                       <Input placeholder="API Key" value={newProvider?.api_key || ""} onChange={(e) => setNewProvider({ ...(newProvider || { provider: "openai" }), api_key: e.target.value })} />
                       <Input placeholder="Base URL (optional)" value={newProvider?.base_url || ""} onChange={(e) => setNewProvider({ ...(newProvider || { provider: "openai" }), base_url: e.target.value })} />
+                      <Input placeholder="Models (comma-separated, optional)" value={newProvider?.models?.join(", ") || ""} onChange={(e) => setNewProvider({ ...(newProvider || { provider: "openai" }), models: e.target.value.split(",").map(m => m.trim()).filter(m => m) })} />
+                      {newProvider?.provider === "openai" && (
+                        <div className="text-xs text-muted-foreground col-span-full">
+                          Leave empty to auto-detect. Or specify: gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4o-mini, gpt-4o, etc.
+                        </div>
+                      )}
                     </div>
                     <div className="flex justify-end">
                       <Button
                         onClick={async () => {
                           if (!newProvider?.provider || !newProvider.api_key) { toast.error("Provider and API key required"); return; }
                           try {
-                            await createLLMProvider({ provider: newProvider.provider, name: newProvider.name, api_key: newProvider.api_key, base_url: newProvider.base_url });
+                            await createLLMProvider({ 
+                              provider: newProvider.provider, 
+                              name: newProvider.name, 
+                              api_key: newProvider.api_key, 
+                              base_url: newProvider.base_url,
+                              config: newProvider.models && newProvider.models.length > 0 ? { models: newProvider.models } : undefined
+                            });
                             const items = await listLLMProviders();
                             setProviders(items);
                             setNewProvider({ provider: "openai", name: "OpenAI" });
@@ -700,7 +712,7 @@ export default function AdminPage() {
                 {/* Quick create agent */}
                 <div className="p-3 border rounded-md space-y-3">
                   <div className="font-medium">Create Agent</div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                     <Input placeholder="Name" value={newAgent.name} onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })} />
                     <Select value={newAgent.product} onValueChange={(v) => setNewAgent({ ...newAgent, product: v })}>
                       <SelectTrigger>
@@ -713,14 +725,24 @@ export default function AdminPage() {
                       </SelectContent>
                     </Select>
                     <Input placeholder="Comma tags (optional)" onChange={(e) => setNewAgent({ ...newAgent, tags: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} />
+                    <Input placeholder="Conversation starters ; separated (optional)" onChange={(e) => setNewAgent({ ...newAgent, starters: e.target.value.split(";").map(s => s.trim()).filter(Boolean) })} />
                   </div>
                   <Input placeholder="Description (optional)" value={newAgent.description || ""} onChange={(e) => setNewAgent({ ...newAgent, description: e.target.value })} />
                   <Input placeholder="Categories comma-separated (optional)" onChange={(e) => setNewAgent({ ...newAgent, categories: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} />
                   <Input placeholder="Knowledge URLs comma-separated (optional)" onChange={(e) => setNewAgent({ ...newAgent, knowledge_urls: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} />
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                     <Input placeholder="Default model_id (optional)" onChange={(e) => setNewAgent({ ...newAgent, defaults: { ...(newAgent.defaults || {}), model_id: e.target.value } })} />
                     <Input placeholder="Default temperature (optional)" type="number" onChange={(e) => setNewAgent({ ...newAgent, defaults: { ...(newAgent.defaults || {}), temperature: parseFloat(e.target.value) } })} />
                     <Input placeholder="Default max_tokens (optional)" type="number" onChange={(e) => setNewAgent({ ...newAgent, defaults: { ...(newAgent.defaults || {}), max_tokens: parseInt(e.target.value || "0") || undefined } })} />
+                    <Select onValueChange={(v) => setNewAgent({ ...newAgent, defaults: { ...(newAgent.defaults || {}), use_rag: v === 'on' } })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Default RAG" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="on">RAG on</SelectItem>
+                        <SelectItem value="off">RAG off</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <textarea
                     placeholder="System instructions"

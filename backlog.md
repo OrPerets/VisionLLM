@@ -70,13 +70,7 @@ Deliver project-scoped collaboration with Google Login, an admin console to mana
   - [x] Validation for unique project name per org/tenant (if applicable)
 
 - As an admin, I can add/remove workers to a project.
-  - [ ] Search users by email/name
   - [x] Add/remove membership instantly reflected in access
-
-- As an admin, I can set “system instructions” per project that affect LLM responses.
-  - [ ] Rich text/Markdown supported
-  - [ ] Versioned history (optional, M5)
-  - [ ] Preview LLM with current instructions (optional)
 
 - As a worker, I can see projects I belong to.
   - [x] Projects page lists only my projects

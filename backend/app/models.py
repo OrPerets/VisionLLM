@@ -158,6 +158,7 @@ class Agent(Base):
     system_instructions = Column(Text, nullable=False)
     knowledge_urls_json = Column(JSON, nullable=True)  # list[str]
     defaults_json = Column(JSON, nullable=True)   # e.g., model_id, temperature, flags
+    starters_json = Column(JSON, nullable=True)   # list[str] - conversation starters
     is_enabled = Column(Integer, nullable=False, default=1)  # 1=true, 0=false for SQLite friendliness
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -183,3 +184,7 @@ class Agent(Base):
     @property
     def defaults(self) -> Optional[dict]:
         return self.defaults_json
+
+    @property
+    def starters(self) -> Optional[list]:
+        return self.starters_json

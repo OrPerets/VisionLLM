@@ -23,6 +23,7 @@ import {
   login,
   logout,
   refreshAuth,
+  getMeta,
 } from "@/lib/api";
 import {
   CreateProjectRequest,
@@ -36,6 +37,7 @@ interface AppStore extends AppState {
   user: UserRead | null;
   isAuthChecked: boolean;
   isAuthenticating: boolean;
+  authEnabled: boolean;
 
   // Actions
   loadProjects: () => Promise<void>;
@@ -96,6 +98,7 @@ export const useAppStore = create<AppStore>()(
       user: null,
       isAuthChecked: false,
       isAuthenticating: false,
+      authEnabled: true, // Default to true, will be updated by checkAuth
 
       // Project actions
       loadProjects: async () => {
@@ -350,10 +353,21 @@ export const useAppStore = create<AppStore>()(
         if (get().isAuthChecked) return;
         
         try {
-          const { user } = await getCurrentUser();
-          set({ user, isAuthChecked: true });
+          // First check if auth is enabled
+          const meta = await getMeta();
+          const authEnabled = meta.auth_enabled ?? true;
+          
+          if (authEnabled) {
+            // Auth is enabled, check current user
+            const { user } = await getCurrentUser();
+            set({ user, isAuthChecked: true, authEnabled });
+          } else {
+            // Auth is disabled, no user needed
+            set({ user: null, isAuthChecked: true, authEnabled: false });
+          }
         } catch (error) {
-          set({ user: null, isAuthChecked: true });
+          // If meta call fails, assume auth is enabled and no user
+          set({ user: null, isAuthChecked: true, authEnabled: true });
         }
       },
 
@@ -414,7 +428,10 @@ export const useAppStore = create<AppStore>()(
       },
 
       isAuthenticated: () => {
-        const { user, isAuthChecked } = get();
+        const { user, isAuthChecked, authEnabled } = get();
+        // If auth is disabled, always return true (authenticated)
+        if (!authEnabled) return true;
+        // If auth is enabled, check if user exists
         return isAuthChecked && user !== null;
       },
     }),

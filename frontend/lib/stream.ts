@@ -69,6 +69,9 @@ export async function streamChat(
             } else if (eventType === "done") {
               onDone(data as StreamDone);
               return; // Stream completed successfully
+            } else if (eventType === "error" && typeof data.error === "string") {
+              onError(new Error(data.error));
+              return; // Stream failed with error
             }
           } catch (parseError) {
             // Ignore JSON parse errors for malformed lines

@@ -13,10 +13,12 @@ import {
   X,
   Search,
   Settings,
-  GitBranch,
   RefreshCw,
   LogOut,
   Brain,
+  Database,
+  Bot,
+  FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -195,18 +197,53 @@ export function AppHeader() {
           </Button>
         </motion.div>
 
-        {/* Git Info */}
-        <motion.div 
-          className="hidden md:flex items-center gap-2 text-sm text-muted-foreground px-3 py-1.5 rounded-md bg-muted/30"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.25 }}
+        {/* SQL Tools Button */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
         >
-          <GitBranch className="h-3.5 w-3.5" />
-          <span className="font-mono text-xs">main</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.href = "/sql"}
+            className="flex items-center gap-3 h-9 px-4 bg-background/50 border-border/50 hover:bg-background/80 hover:border-border"
+          >
+            <Database className="h-4 w-4" />
+            <span className="hidden sm:inline text-sm">SQL Tools</span>
+          </Button>
         </motion.div>
 
-        <div className="h-6 w-px bg-border/50" />
+        {/* Agents Button */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.href = "/agents"}
+            className="flex items-center gap-3 h-9 px-4 bg-background/50 border-border/50 hover:bg-background/80 hover:border-border"
+          >
+            <Bot className="h-4 w-4" />
+            <span className="hidden sm:inline text-sm">Agents</span>
+          </Button>
+        </motion.div>
+
+        {/* Projects Button */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.href = "/projects"}
+            className="flex items-center gap-3 h-9 px-4 bg-background/50 border-border/50 hover:bg-background/80 hover:border-border"
+          >
+            <FolderOpen className="h-4 w-4" />
+            <span className="hidden sm:inline text-sm">Projects</span>
+          </Button>
+        </motion.div>
 
         {/* Right Sidebar Toggle */}
         <motion.div

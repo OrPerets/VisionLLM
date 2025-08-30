@@ -149,9 +149,9 @@ async def oauth_callback(request: Request, code: str, state: str, db: Session = 
         # fallback to first CORS origin if provided
         try:
             first = (settings.cors_origin or "").split(",")[0].strip()
-            target = first or "http://localhost:3000"
+            target = first or ""
         except Exception:
-            target = "http://localhost:3000"
+            target = ""
     return RedirectResponse(url=target)
 
 

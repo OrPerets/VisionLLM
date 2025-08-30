@@ -234,6 +234,7 @@ class AgentBase(BaseModel):
     system_instructions: str
     knowledge_urls: Optional[list[str]] = None
     defaults: Optional[dict] = None
+    starters: Optional[list[str]] = None
     is_enabled: Optional[bool] = True
 
 
@@ -250,6 +251,7 @@ class AgentUpdate(BaseModel):
     system_instructions: Optional[str] = None
     knowledge_urls: Optional[list[str]] = None
     defaults: Optional[dict] = None
+    starters: Optional[list[str]] = None
     is_enabled: Optional[bool] = None
 
 

@@ -30,7 +30,32 @@ import {
   AgentUpdate,
 } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api";
+// Get API base with fallback for Railway deployment
+function getApiBase(): string {
+  // First try environment variable
+  if (process.env.NEXT_PUBLIC_API_BASE) {
+    return process.env.NEXT_PUBLIC_API_BASE;
+  }
+  
+  // Fallback: construct from current URL for Railway
+  if (typeof window !== 'undefined') {
+    const currentOrigin = window.location.origin;
+    
+    // Local development: use localhost:8000 for backend
+    if (currentOrigin.includes('localhost:3000')) {
+      return 'http://localhost:8000/api';
+    }
+    
+    // Railway deployment: Replace frontend service name with backend service name
+    const backendOrigin = currentOrigin.replace('vision-llm-frontend', 'discerning-wonder');
+    return `${backendOrigin}/api`;
+  }
+  
+  return '';
+}
+
+const API_BASE = getApiBase();
+console.log("API_BASE:", API_BASE, "NEXT_PUBLIC_API_BASE:", process.env.NEXT_PUBLIC_API_BASE, "Current origin:", typeof window !== 'undefined' ? window.location.origin : 'server');
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -354,5 +379,6 @@ export async function refreshAuth(): Promise<{ user: UserRead | null }> {
 
 // Google OAuth redirect (for existing flow)
 export function redirectToGoogleLogin(): void {
+  console.log("Redirecting to Google login with API_BASE:", API_BASE);
   window.location.href = `${API_BASE}/auth/login/google`;
 }

@@ -21,10 +21,7 @@ def create_app() -> FastAPI:
 	app = FastAPI(title="VisionBI AI Assistant API", version="0.1.0")
 
 	# Build allowed CORS origins: merge comma-separated env with sensible local defaults
-	allowed_origins = [
-		"http://localhost:3000",
-		"http://localhost:3001",
-	]
+	allowed_origins = []
 	if settings.cors_origin:
 		env_origins = [o.strip() for o in settings.cors_origin.split(",") if o.strip()]
 		# Preserve order: env first, then defaults, and deduplicate

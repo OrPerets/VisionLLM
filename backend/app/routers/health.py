@@ -43,6 +43,7 @@ async def meta() -> dict[str, str | bool]:
         "model_server_ok": ok,
         "model_id": model_id,
         "provider_ok": provider_ok,
+        "auth_enabled": settings.enable_auth,
     }
 
 

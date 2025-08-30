@@ -404,6 +404,7 @@ def admin_create_agent(payload: AgentCreate, db: Session = Depends(get_db)):
         system_instructions=payload.system_instructions,
         knowledge_urls_json=payload.knowledge_urls,
         defaults_json=payload.defaults,
+        starters_json=getattr(payload, "starters", None),
         is_enabled=1 if (payload.is_enabled is None or payload.is_enabled) else 0,
     )
     db.add(item)
@@ -433,6 +434,8 @@ def admin_update_agent(agent_id: int, payload: AgentUpdate, db: Session = Depend
         item.knowledge_urls_json = payload.knowledge_urls
     if payload.defaults is not None:
         item.defaults_json = payload.defaults
+    if getattr(payload, "starters", None) is not None:
+        item.starters_json = payload.starters
     if payload.is_enabled is not None:
         item.is_enabled = 1 if payload.is_enabled else 0
     db.add(item)

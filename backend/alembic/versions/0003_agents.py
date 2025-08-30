@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column('system_instructions', sa.Text(), nullable=False),
         sa.Column('knowledge_urls_json', sa.JSON(), nullable=True),
         sa.Column('defaults_json', sa.JSON(), nullable=True),
+        sa.Column('starters_json', sa.JSON(), nullable=True),
         sa.Column('is_enabled', sa.Integer(), nullable=False, server_default='1'),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=False),

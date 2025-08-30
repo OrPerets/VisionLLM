@@ -48,6 +48,7 @@ export interface Meta {
   model_server_ok: boolean;
   model_id: string;
   provider_ok?: boolean;
+  auth_enabled?: boolean;
 }
 
 // Models admin
@@ -178,6 +179,7 @@ export interface Agent {
   system_instructions: string;
   knowledge_urls?: string[] | null;
   defaults?: Record<string, any> | null;
+  starters?: string[] | null;
   is_enabled?: boolean;
   created_at: string;
   updated_at: string;
@@ -206,6 +208,7 @@ export interface AgentCreate {
   system_instructions: string;
   knowledge_urls?: string[];
   defaults?: Record<string, any>;
+  starters?: string[];
   is_enabled?: boolean;
 }
 
@@ -218,6 +221,7 @@ export interface AgentUpdate {
   system_instructions?: string;
   knowledge_urls?: string[];
   defaults?: Record<string, any>;
+  starters?: string[];
   is_enabled?: boolean;
 }
 

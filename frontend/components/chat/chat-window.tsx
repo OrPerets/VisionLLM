@@ -189,134 +189,82 @@ export function ChatWindow() {
 
   return (
     <motion.div 
-      className="relative h-full group"
+      className="relative h-full group bg-background"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Export controls - repositioned to avoid overlap */}
-      <motion.div 
-        className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 0, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={async () => {
-              if (!selectedConversationId) return;
-              try {
-                const data = await exportConversationJSON(selectedConversationId);
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `conversation-${selectedConversationId}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                toast.success("JSON exported successfully");
-              } catch (e) {
-                toast.error("Export failed");
-              }
-            }}
-            className="h-8 px-3 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-background/90 shadow-sm text-xs"
-          >
-            <Download className="h-3 w-3 mr-1.5" /> JSON
-          </Button>
-        </motion.div>
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={async () => {
-              if (!selectedConversationId) return;
-              try {
-                const text = await exportConversationMarkdown(selectedConversationId);
-                const blob = new Blob([text], { type: "text/markdown" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `conversation-${selectedConversationId}.md`;
-                a.click();
-                URL.revokeObjectURL(url);
-                toast.success("Markdown exported successfully");
-              } catch (e) {
-                toast.error("Export failed");
-              }
-            }}
-            className="h-8 px-3 bg-background/80 backdrop-blur-sm border-border/50 hover:bg-background/90 shadow-sm text-xs"
-          >
-            <Download className="h-3 w-3 mr-1.5" /> MD
-          </Button>
-        </motion.div>
-      </motion.div>
       <ScrollArea 
         className="h-full custom-scrollbar"
         onScrollCapture={handleScroll}
       >
-        <motion.div 
-          ref={scrollAreaRef} 
-          className="divide-y divide-border/50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <AnimatePresence mode="popLayout">
-            {messages.map((message, index) => {
-              const isGrouped = index > 0 && 
-                messages[index - 1]?.role === message.role &&
-                new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() < 5 * 60 * 1000; // 5 minutes
-              
-              return (
-                <MessageItem
-                  key={message.id}
-                  message={message}
-                  isLatest={index === messages.length - 1}
-                  isGrouped={isGrouped}
-                  showAvatar={!isGrouped}
-                />
-              );
-            })}
-          </AnimatePresence>
-          
-          {/* Loading indicator for streaming */}
-          <AnimatePresence>
-            {messages.length > 0 && messages[messages.length - 1]?.content === "" && (
-              <motion.div 
-                className="px-6 py-4"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-8">
-                    <div className="h-8 w-8 rounded-full bg-emerald-50 ring-2 ring-emerald-100 flex items-center justify-center">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Sparkles className="h-4 w-4 text-emerald-600" />
-                      </motion.div>
+        {/* Centered Chat Container */}
+        <div className="mx-auto max-w-[768px] w-full">
+          <motion.div 
+            ref={scrollAreaRef} 
+            className="min-h-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <AnimatePresence mode="popLayout">
+              {messages.map((message, index) => {
+                const isGrouped = index > 0 && 
+                  messages[index - 1]?.role === message.role &&
+                  new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() < 5 * 60 * 1000; // 5 minutes
+                
+                return (
+                  <MessageItem
+                    key={message.id}
+                    message={message}
+                    isLatest={index === messages.length - 1}
+                    isGrouped={isGrouped}
+                    showAvatar={!isGrouped}
+                  />
+                );
+              })}
+            </AnimatePresence>
+            
+            {/* Loading indicator for streaming */}
+            <AnimatePresence>
+              {messages.length > 0 && messages[messages.length - 1]?.content === "" && (
+                <motion.div 
+                  className="px-6 py-6"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="flex gap-4 items-start">
+                    <div className="flex-shrink-0 w-8">
+                      <div className="h-8 w-8 rounded-full bg-emerald-50 ring-2 ring-emerald-100 flex items-center justify-center">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Sparkles className="h-4 w-4 text-emerald-600" />
+                        </motion.div>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <MessageSkeleton />
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <MessageSkeleton />
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Add some bottom padding for better scroll experience */}
+            <div className="h-32" />
+          </motion.div>
+        </div>
       </ScrollArea>
 
       {/* Scroll to bottom button */}
       <AnimatePresence>
         {showScrollToBottom && (
           <motion.div 
-            className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-30"
+            className="absolute bottom-6 right-6 z-30"
             initial={{ opacity: 0, scale: 0.8, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -334,7 +282,7 @@ export function ChatWindow() {
                 variant="outline"
                 size="icon"
                 onClick={handleScrollToBottom}
-                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full shadow-lg bg-background/90 backdrop-blur-sm border-2 border-border/50 hover:bg-background hover:border-border hover:shadow-xl transition-all duration-200"
+                className="h-10 w-10 rounded-full shadow-lg bg-background/90 backdrop-blur-sm border border-border/50 hover:bg-background hover:border-border hover:shadow-xl transition-all duration-200"
               >
                 <motion.div
                   animate={{ y: [0, 2, 0] }}
@@ -344,7 +292,7 @@ export function ChatWindow() {
                     ease: "easeInOut"
                   }}
                 >
-                  <ArrowDown className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <ArrowDown className="h-4 w-4" />
                 </motion.div>
               </Button>
             </motion.div>

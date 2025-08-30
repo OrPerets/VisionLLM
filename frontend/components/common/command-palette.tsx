@@ -18,6 +18,7 @@ import {
   Settings,
   Database,
   BarChart3,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +65,14 @@ export function CommandPalette() {
       icon: <Database className="h-4 w-4" />,
       action: () => router.push("/sql"),
       keywords: ["sql", "tools", "transpile", "lint"],
+    },
+    {
+      id: "nav-agents",
+      title: "Go to Agent Recommendations",
+      description: "Get AI-powered agent suggestions",
+      icon: <Bot className="h-4 w-4" />,
+      action: () => router.push("/agents"),
+      keywords: ["agents", "recommendations", "ai", "suggestions"],
     },
 
     // Actions
