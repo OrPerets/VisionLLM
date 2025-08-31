@@ -90,3 +90,9 @@ The backend uses `tools/sql_tools.py` for transpile and lint/fix.
 ### Design tokens
 Preserved from the desktop app (accent `#2563eb`, neutrals, spacing, radius, font sizes) and applied in the web UI.
 
+### Maintenance Workflow
+
+Admins can access the `/maintenance` page to describe new features. Once the chat assistant replies `CONFIRMED`, the transcript can be submitted to `/api/maintenance/plan` and a Markdown implementation plan is saved under `tasks/`.
+
+The helper script `scripts/auto_coder.py` reads a plan file, runs `pytest` and `npm test`, commits the results on a new branch, pushes, and opens a pull request. All generated plans remain version-controlled for an audit trail.
+
