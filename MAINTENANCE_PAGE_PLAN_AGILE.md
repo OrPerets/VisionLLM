@@ -5,15 +5,22 @@
 - Provide a self-service `/maintenance` page where the CEO or other admins can describe new features in natural language.
 - An AI chat assistant asks clarifying questions until requirements are actionable and emits `CONFIRMED` when ready.
 - The backend converts the confirmed transcript into a Markdown implementation plan and stores it under `tasks/` using a timestamped slug.
-- Optionally, an automated coding agent can read the plan, apply code changes, run tests, and open a pull request.
+- After a plan is generated, an automated coding agent (using Codex or a similar coding service) implements the feature, runs tests, commits to a dedicated branch, pushes, and opens a pull request.
 - The repository consists of a FastAPI backend and Next.js frontend with existing chat infrastructure and Makefile tooling.
+
+### End-to-End Workflow
+1. The CEO requests a new feature on the `/maintenance` page.
+2. The AI assistant interacts with the CEO, asking clarifying questions.
+3. Once the requirements are confirmed, the agent produces a detailed plan.
+4. A coding service such as Codex develops the feature following the plan.
+5. The agent runs tests and commits the changes to a non-`main` branch, then pushes and opens a PR.
 
 ## Success Criteria
 
 - Access to the maintenance page and endpoints is restricted to authenticated admins.
 - Requirement gathering covers acceptance criteria, data model updates, API endpoints, and UI changes before `CONFIRMED` is issued.
 - Generated plans are saved to `tasks/<timestamp>-<slug>.md` and linked back to the requester.
-- When invoked, the automated agent runs `pytest` and `npm test`, commits changes, and opens a PR.
+- When invoked, the automated agent uses a coding service (e.g., Codex) to implement the feature, runs `pytest` and `npm test`, commits the changes to a non-`main` branch, pushes, and opens a PR.
 - Documentation in `README.md` describes the maintenance workflow and all generated files are version-controlled for audit purposes.
 
 ## Sprint 1 – Maintenance Page & Chat Requirements
@@ -23,7 +30,9 @@
 
 ### Tasks
 - [ ] Create `/maintenance` Next.js route guarded for admins only.
-- [ ] Embed existing chat component with a special system prompt: *"You are a product-spec assistant…"*
+- [ ] Embed existing chat component with a system prompt detailing full instructions:
+
+    *"You are an AI development agent. When the CEO describes a feature, ask clarifying questions until requirements are actionable and reply `CONFIRMED`. After confirmation, draft an implementation plan and invoke a coding service (e.g., Codex) to implement the feature. Run `pytest` and `npm test`, commit to a non-`main` branch, push, and open a pull request."*
 - [ ] Display "Generate Plan" button, enabled only after the assistant replies `CONFIRMED`.
 - [ ] Add backend router `POST /api/maintenance/stream` for requirement collection.
 
@@ -53,18 +62,18 @@
 
 ## Sprint 3 – Automation, Docs & Quality Assurance
 
-**Duration:** 1–2 weeks  
-**Goal:** Provide optional automated code generation and complete documentation/testing.
+**Duration:** 1–2 weeks
+**Goal:** Provide automated code generation and complete documentation/testing.
 
 ### Tasks
-- [ ] Prototype automated coding agent: read plan, modify files, run `pytest` and `npm test`, commit, and open PR.
+- [ ] Build automated coding agent using Codex or a similar service: read the plan, modify files, run `pytest` and `npm test`, commit to a feature branch, push, and open a PR.
 - [ ] Add FastAPI unit tests for new routes and integration test simulating a maintenance request.
 - [ ] Add frontend tests for admin access and plan generation flow.
 - [ ] Document usage in `README.md` and link to generated `tasks/` files.
 - [ ] Enforce admin authentication and ensure generated files are version-controlled for audit trail.
 
 ### Definition of Done
-- Automated agent successfully opens a PR in a dry run.
+- Automated agent successfully implements code and opens a PR from a non-`main` branch in a dry run.
 - Tests cover new backend and frontend pieces.
 - README describes maintenance workflow clearly.
 
