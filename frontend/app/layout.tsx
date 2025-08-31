@@ -50,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const isLoginPage = pathname === "/login";
   
   // Check if current route requires admin access
-  const isAdminRoute = pathname.startsWith("/admin");
+  const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/maintenance");
 
   return (
     <html lang="en" suppressHydrationWarning>

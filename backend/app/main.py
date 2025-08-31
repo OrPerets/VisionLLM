@@ -12,7 +12,7 @@ for p in [repo_root, "/", os.path.join(repo_root, "tools")]:
 	if p not in sys.path:
 		sys.path.append(p)
 
-from .routers import health, projects, conversations, messages, sqltools, chat
+from .routers import health, projects, conversations, messages, sqltools, chat, maintenance
 from .db import init_db, engine
 from .services.tgi_client import client as tgi
 
@@ -49,7 +49,8 @@ def create_app() -> FastAPI:
 	app.include_router(sqltools.router, prefix="/api")
 	from .routers import auth as auth_router
 
-	app.include_router(chat.router, prefix="/api")
+        app.include_router(chat.router, prefix="/api")
+        app.include_router(maintenance.router, prefix="/api")
 	app.include_router(auth_router.router, prefix="/api")
 	from .routers import admin as admin_router
 	app.include_router(admin_router.router, prefix="/api")

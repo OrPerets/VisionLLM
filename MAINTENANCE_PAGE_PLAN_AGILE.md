@@ -29,12 +29,12 @@
 **Goal:** Allow admins to access a maintenance page with a requirement-gathering chat.
 
 ### Tasks
-- [ ] Create `/maintenance` Next.js route guarded for admins only.
-- [ ] Embed existing chat component with a system prompt detailing full instructions:
+- [x] Create `/maintenance` Next.js route guarded for admins only.
+- [x] Embed existing chat component with a system prompt detailing full instructions:
 
     *"You are an AI development agent. When the CEO describes a feature, ask clarifying questions until requirements are actionable and reply `CONFIRMED`. After confirmation, draft an implementation plan and invoke a coding service (e.g., Codex) to implement the feature. Run `pytest` and `npm test`, commit to a non-`main` branch, push, and open a pull request."*
-- [ ] Display "Generate Plan" button, enabled only after the assistant replies `CONFIRMED`.
-- [ ] Add backend router `POST /api/maintenance/stream` for requirement collection.
+- [x] Display "Generate Plan" button, enabled only after the assistant replies `CONFIRMED`.
+- [x] Add backend router `POST /api/maintenance/stream` for requirement collection.
 
 ### Definition of Done
 - Admin-only page renders successfully.
