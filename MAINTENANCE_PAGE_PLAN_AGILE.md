@@ -85,10 +85,10 @@
 **Goal:** Verify the complete maintenance workflow from request to pull request.
 
 ### Tasks
-- [ ] Simulate an admin creating a maintenance request, generating a plan, and triggering the automated agent.
-- [ ] Add integration tests covering the full flow from chat to generated plan and automated commit.
-- [ ] Perform manual smoke tests ensuring tasks are saved and linked for audit.
-- [ ] Document how to run the end-to-end test and troubleshoot failures.
+- [x] Simulate an admin creating a maintenance request, generating a plan, and triggering the automated agent.
+- [x] Add integration tests covering the full flow from chat to generated plan and automated commit.
+- [x] Perform manual smoke tests ensuring tasks are saved and linked for audit.
+- [x] Document how to run the end-to-end test and troubleshoot failures.
 
 ### Definition of Done
 - Full workflow executes without errors.

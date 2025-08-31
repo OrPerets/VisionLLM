@@ -96,3 +96,13 @@ Admins can access the `/maintenance` page to describe new features. Once the cha
 
 The helper script `scripts/auto_coder.py` reads a plan file, runs `pytest` and `npm test`, commits the results on a new branch, pushes, and opens a pull request. All generated plans remain version-controlled for an audit trail.
 
+### End-to-End Maintenance Test
+
+An integration test exercises the entire maintenance workflow—from chat to plan generation and automated agent execution.
+
+```bash
+pytest backend/tests/test_maintenance.py::test_full_maintenance_workflow
+```
+
+The test mocks LLM and git interactions so it can run locally without side effects. If it fails due to missing Python packages, ensure dependencies are installed via `pip install -r requirements.txt`. Frontend tests can be run with `npm test --prefix frontend`; install dependencies first using `npm install --prefix frontend` if `npm` reports missing modules.
+
