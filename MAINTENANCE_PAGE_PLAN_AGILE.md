@@ -49,10 +49,10 @@
 **Goal:** Convert a confirmed conversation into a saved implementation plan.
 
 ### Tasks
-- [ ] Implement `POST /api/maintenance/plan` to accept transcript, prompt the LLM for a Markdown plan (summary, user stories, layer-by-layer steps, test plan).
-- [ ] Save plan to `tasks/<timestamp>-<slug>.md` and return link.
-- [ ] Update API typings and helpers (e.g., `frontend/lib/types.ts`).
-- [ ] Wire frontend "Generate Plan" action to call the new endpoint.
+- [x] Implement `POST /api/maintenance/plan` to accept transcript, prompt the LLM for a Markdown plan (summary, user stories, layer-by-layer steps, test plan).
+- [x] Save plan to `tasks/<timestamp>-<slug>.md` and return link.
+- [x] Update API typings and helpers (e.g., `frontend/lib/types.ts`).
+- [x] Wire frontend "Generate Plan" action to call the new endpoint.
 
 ### Definition of Done
 - Endpoint returns saved plan link.

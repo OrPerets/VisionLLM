@@ -54,6 +54,8 @@ def create_app() -> FastAPI:
 	app.include_router(auth_router.router, prefix="/api")
 	from .routers import admin as admin_router
 	app.include_router(admin_router.router, prefix="/api")
+	from .routers import maintenance as maintenance_router
+	app.include_router(maintenance_router.router, prefix="/api")
 	from .routers import agents as agents_router
 	app.include_router(agents_router.router, prefix="/api")
 
