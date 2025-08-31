@@ -198,6 +198,20 @@ export interface AgentRecommendation {
   reason: string;
 }
 
+// Maintenance planning
+export interface MaintenanceMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface MaintenancePlanRequest {
+  transcript: MaintenanceMessage[];
+}
+
+export interface MaintenancePlanResponse {
+  link: string;
+}
+
 // Admin: Agents create/update
 export interface AgentCreate {
   name: string;
