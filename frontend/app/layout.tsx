@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CommandPalette } from "@/components/common/command-palette";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useUIStore } from "@/lib/ui";
+import { isAdminRoute } from "@/lib/routes";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -50,7 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const isLoginPage = pathname === "/login";
   
   // Check if current route requires admin access
-  const isAdminRoute = pathname.startsWith("/admin");
+  const adminRoute = isAdminRoute(pathname);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -66,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ProtectedRoute requireAuth={false} key="login">
                 {children}
               </ProtectedRoute>
-            ) : isAdminRoute ? (
+            ) : adminRoute ? (
               // Admin routes - full page without AppShell
               <ProtectedRoute 
                 requireAuth={true} 

@@ -28,6 +28,8 @@ import {
   AgentRecommendation,
   AgentCreate,
   AgentUpdate,
+  MaintenancePlanRequest,
+  MaintenancePlanResponse,
 } from "./types";
 
 // Get API base with fallback for Railway deployment
@@ -348,6 +350,15 @@ export async function adminCleanupDB(scope: "chat" | "all" | "demo"): Promise<{ 
   return fetchJson<{ ok: true; counts?: Record<string, number> }>(`${API_BASE}/admin/maintenance/cleanup`, {
     method: "POST",
     body: JSON.stringify({ scope }),
+  });
+}
+
+export async function generateMaintenancePlan(
+  data: MaintenancePlanRequest
+): Promise<MaintenancePlanResponse> {
+  return fetchJson<MaintenancePlanResponse>(`${API_BASE}/maintenance/plan`, {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }
 
